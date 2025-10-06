@@ -1,6 +1,5 @@
 # Lectures
-大学の講義で使用するリポジトリ
-
+大学の講義で使用するリポジトリ<br>
 https://odm135.github.io/Lectures/
 
 ---
