@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>スプラトゥーン風ゲーム</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        #gameContainer {
+            position: relative;
+            background: #fff;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        #gameCanvas {
+            display: block;
+            cursor: crosshair;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .stat {
+            background: rgba(255,255,255,0.9);
+            padding: 15px 25px;
+            border-radius: 15px;
+            font-weight: bold;
+            font-size: 18px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        #score {
+            color: #667eea;
+        }
+        #timer {
+            color: #e74c3c;
+        }
+        #coverage {
+            color: #27ae60;
+        }
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255,255,255,0.95);
+            padding: 40px 60px;
+            border-radius: 20px;
+            text-align: center;
+            display: none;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            z-index: 20;
+        }
+        #gameOver h2 {
+            font-size: 36px;
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+        #gameOver p {
+            font-size: 20px;
+            margin: 10px 0;
+            color: #333;
+        }
+        #restartBtn {
+            margin-top: 20px;
+            padding: 15px 40px;
+            font-size: 18px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s;
+            pointer-events: auto;
+        }
+        #restartBtn:hover {
+            transform: scale(1.05);
+        }
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.9);
+            padding: 15px 30px;
+            border-radius: 15px;
+            font-size: 14px;
+            color: #333;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div id="ui">
+            <div id="score" class="stat">スコア: 0</div>
+            <div id="timer" class="stat">残り時間: 60</div>
+            <div id="coverage" class="stat">塗り率: 0%</div>
+        </div>
+        <div id="instructions">
+            クリックして塗ろう！ 60秒でできるだけ多く塗りつぶせ！
+        </div>
+        <div id="gameOver">
+            <h2>ゲーム終了！</h2>
+            <p id="finalScore"></p>
+            <p id="finalCoverage"></p>
+            <button id="restartBtn">もう一度プレイ</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const timerEl = document.getElementById('timer');
+        const coverageEl = document.getElementById('coverage');
+        const gameOverEl = document.getElementById('gameOver');
+        const finalScoreEl = document.getElementById('finalScore');
+        const finalCoverageEl = document.getElementById('finalCoverage');
+        const restartBtn = document.getElementById('restartBtn');
+
+        let score = 0;
+        let timeLeft = 60;
+        let gameRunning = true;
+        let paintedPixels = new Set();
+        const totalPixels = canvas.width * canvas.height;
+
+        const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F'];
+        let currentColor = colors[0];
+
+        const particles = [];
+        const permanentSplats = [];
+        const animatedSplats = [];
+
+        // 背景を描画
+        function drawBackground() {
+            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            gradient.addColorStop(0, '#f0f0f0');
+            gradient.addColorStop(1, '#e0e0e0');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // パーティクルクラス
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 8;
+                this.vy = (Math.random() - 0.5) * 8 - 2;
+                this.life = 1;
+                this.color = color;
+                this.size = Math.random() * 8 + 4;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.3;
+                this.life -= 0.02;
+                this.size *= 0.97;
+            }
+
+            draw() {
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        // 永続的なスプラットクラス
+        class PermanentSplat {
+            constructor(x, y, color, radius) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.radius = radius;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = 0.8;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        // アニメーション用スプラットクラス
+        class AnimatedSplat {
+            constructor(x, y, color, targetRadius) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.radius = 0;
+                this.targetRadius = targetRadius;
+                this.speed = 4;
+            }
+
+            update() {
+                if (this.radius < this.targetRadius) {
+                    this.radius += this.speed;
+                    this.speed *= 0.92;
+                    return true;
+                }
+                return false;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = 0.8;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        // マウスクリック処理
+        canvas.addEventListener('click', (e) => {
+            if (!gameRunning) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            // 色をランダムに変更
+            currentColor = colors[Math.floor(Math.random() * colors.length)];
+
+            // パーティクルを生成
+            for (let i = 0; i < 20; i++) {
+                particles.push(new Particle(x, y, currentColor));
+            }
+
+            // スプラットの半径を決定
+            const splatRadius = Math.random() * 30 + 40;
+
+            // アニメーション用スプラットを生成
+            animatedSplats.push(new AnimatedSplat(x, y, currentColor, splatRadius));
+            
+            // 永続的なスプラットを追加
+            permanentSplats.push(new PermanentSplat(x, y, currentColor, splatRadius));
+            
+            // スコア計算
+            for (let angle = 0; angle < Math.PI * 2; angle += 0.05) {
+                for (let r = 0; r < splatRadius; r += 1) {
+                    const px = Math.floor(x + Math.cos(angle) * r);
+                    const py = Math.floor(y + Math.sin(angle) * r);
+                    if (px >= 0 && px < canvas.width && py >= 0 && py < canvas.height) {
+                        const key = px + ',' + py;
+                        if (!paintedPixels.has(key)) {
+                            paintedPixels.add(key);
+                            score += 1;
+                        }
+                    }
+                }
+            }
+        });
+
+        // ゲームループ
+        function gameLoop() {
+            drawBackground();
+
+            // 永続的なスプラットを描画
+            for (let i = 0; i < permanentSplats.length; i++) {
+                permanentSplats[i].draw();
+            }
+
+            // アニメーション中のスプラットを描画・更新
+            for (let i = animatedSplats.length - 1; i >= 0; i--) {
+                animatedSplats[i].draw();
+                if (!animatedSplats[i].update()) {
+                    animatedSplats.splice(i, 1);
+                }
+            }
+
+            // パーティクルを更新・描画
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                particles[i].draw();
+                if (particles[i].life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            // UIを更新
+            scoreEl.textContent = 'スコア: ' + score;
+            const coverage = ((paintedPixels.size / totalPixels) * 100).toFixed(1);
+            coverageEl.textContent = '塗り率: ' + coverage + '%';
+
+            if (gameRunning) {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // タイマー
+        const timerInterval = setInterval(() => {
+            if (gameRunning) {
+                timeLeft--;
+                timerEl.textContent = '残り時間: ' + timeLeft;
+                
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }
+        }, 1000);
+
+        // ゲーム終了
+        function endGame() {
+            gameRunning = false;
+            clearInterval(timerInterval);
+            const coverage = ((paintedPixels.size / totalPixels) * 100).toFixed(1);
+            finalScoreEl.textContent = '最終スコア: ' + score;
+            finalCoverageEl.textContent = '塗り率: ' + coverage + '%';
+            gameOverEl.style.display = 'block';
+        }
+
+        // リスタート
+        restartBtn.addEventListener('click', () => {
+            location.reload();
+        });
+
+        // ゲーム開始
+        drawBackground();
+        gameLoop();
+    </script>
+</body>
+</html>

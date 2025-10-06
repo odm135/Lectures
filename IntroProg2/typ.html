@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Typing Game + AI Prompts (Sampling Enabled)</title>
+  <style>
+    :root {
+      --bg: #0f172a; --panel: #111827cc; --text: #e5e7eb; --muted: #94a3b8; --brand: #22d3ee; --ok: #34d399; --bad: #f87171; --card: #0b1224; --shadow: 0 10px 30px rgba(0,0,0,.35);
+    }
+    * { box-sizing: border-box; } html, body { height: 100%; }
+    body { margin: 0; background: radial-gradient(1200px 700px at 10% 10%, #102040, var(--bg)); color: var(--text); font: 16px/1.6 system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Sans", "Noto Sans JP", sans-serif; display: grid; place-items: center; }
+    .app { width: min(920px, 92vw); padding: 24px; border-radius: 20px; background: linear-gradient(180deg, #0b1020cc, #0b1020e6); box-shadow: var(--shadow); backdrop-filter: blur(6px); }
+    h1 { margin: 0 0 8px; font-size: clamp(20px, 2.8vw, 28px); letter-spacing: .3px; }
+    .sub { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .status { color: var(--muted); font-size: 14px; margin: 8px 0 14px; min-height: 22px; }
+    button { appearance: none; border: 0; padding: 10px 14px; border-radius: 14px; cursor: pointer; font-weight: 600; background: linear-gradient(180deg, #12233a, #0f1b2f); color: #d2eaff; box-shadow: inset 0 0 0 1px #1e3a5f, 0 4px 14px rgba(0,0,0,.25); transition: transform .08s ease, box-shadow .2s ease, opacity .2s ease; }
+    button:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px #2a4f7f, 0 8px 20px rgba(0,0,0,.3); }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    .prompt { margin: 16px 0 8px; padding: 18px 16px; font-size: clamp(18px, 2.2vw, 22px); background: linear-gradient(180deg, #0c1527, #0b1224); border-radius: 16px; box-shadow: inset 0 0 0 1px #1d2a45; min-height: 72px; letter-spacing: .2px; word-break: break-word; }
+    .prompt span { padding: 0 1px; border-radius: 4px; }
+    .pending { color: #b7c2d6; opacity: .8; } .correct { background: #0d2b24; color: var(--ok); box-shadow: inset 0 0 0 1px #1a6f55; } .wrong { background: #32161a; color: var(--bad); box-shadow: inset 0 0 0 1px #7f2733; }
+    input[type="text"] { width: 100%; padding: 14px 16px; border-radius: 14px; border: 1px solid #1f2c49; outline: none; background: #0b1224; color: var(--text); font-size: clamp(16px, 2vw, 18px); box-shadow: inset 0 0 0 1px #1a2640; }
+    input[type="text"]:focus { box-shadow: inset 0 0 0 2px #274376, 0 0 0 4px #0e1a32; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px; }
+    .stat { background: #0b1224; border: 1px solid #18233f; padding: 12px 14px; border-radius: 14px; text-align: center; }
+    .stat .label { color: var(--muted); font-size: 12px; letter-spacing: .3px; }
+    .stat .value { font-size: 22px; font-weight: 800; }
+    .footer { color: var(--muted); font-size: 12px; margin-top: 14px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>Typing Game</h1>
+    <p class="sub">AIがその場でお題文を作ります（ブラウザ内推論／APIなし）。</p>
+
+    <div class="row">
+      <button id="new">新しいお題（AI）</button>
+      <button id="fallback">内蔵お題</button>
+      <button id="reset">リセット</button>
+    </div>
+    <div class="status" id="status">AI初期化中…（初回のみダウンロードが発生します）</div>
+
+    <div class="prompt" id="prompt" aria-live="polite"></div>
+    <input id="type" type="text" placeholder="ここにタイプ" autocomplete="off" autocapitalize="off" spellcheck="false" />
+
+    <div class="stats">
+      <div class="stat"><div class="label">WPM</div><div class="value" id="wpm">0</div></div>
+      <div class="stat"><div class="label">正確さ</div><div class="value" id="acc">100%</div></div>
+      <div class="stat"><div class="label">経過</div><div class="value" id="elapsed">0.0s</div></div>
+    </div>
+
+    <p class="footer">※ 日本語のお題は軽量モデルが少ないため英語生成にしています。日本語が必要な場合のメモはソース下部を参照。</p>
+  </div>
+
+  <script type="module">
+    import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
+
+    const els = {
+      prompt: document.getElementById('prompt'), input: document.getElementById('type'), wpm: document.getElementById('wpm'), acc: document.getElementById('acc'), elapsed: document.getElementById('elapsed'), status: document.getElementById('status'), newBtn: document.getElementById('new'), fallbackBtn: document.getElementById('fallback'), resetBtn: document.getElementById('reset'),
+    };
+
+    const FALLBACKS = [
+      'type swift and steady without looking down',
+      'keep your hands light and your eyes forward',
+      'practice makes progress so enjoy the flow',
+      'every quick brown fox learns by doing',
+      'stay calm breathe slowly and trust your rhythm',
+      'small steps stack up into speedy typing skill',
+      'move with purpose and finish the line cleanly',
+      'accuracy first then speed will follow naturally',
+      'train your fingers to dance across the keys',
+      'clear mind quiet hands crisp letters on screen',
+      'focus on form and the pace will rise later',
+      'steady tempo smooth strokes minimal backspace',
+      'eyes on the words fingers on the home row',
+      'stretch your wrists and keep good posture',
+      'consistency beats bursts build habits daily'
+    ];
+
+    let generatorPromise = null;
+    const seen = new Set();
+
+    function ensureGenerator() {
+      if (!generatorPromise) {
+        generatorPromise = (async () => {
+          try {
+            els.status.textContent = 'AI準備中…（モデル読込）';
+            const gen = await pipeline('text-generation', 'Xenova/distilgpt2');
+            els.status.textContent = 'AI準備OK';
+            return gen;
+          } catch (err) {
+            console.error(err);
+            els.status.textContent = 'AI利用不可：内蔵お題を使います';
+            return null;
+          }
+        })();
+      }
+      return generatorPromise;
+    }
+
+    async function generateAIText() {
+      const gen = await ensureGenerator();
+      if (!gen) return pickFallback();
+
+      const sys = 'Write one short, clean, typable practice sentence in plain English, no quotes, no newlines, 40-80 characters.';
+      const out = await gen(sys, {
+        max_new_tokens: 60,
+        do_sample: true,
+        temperature: 0.9,
+        top_p: 0.95,
+        top_k: 50,
+        repetition_penalty: 1.1,
+        seed: Math.floor(Math.random() * 2**32),
+      });
+      let text = out?.[0]?.generated_text || '';
+      if (text.startsWith(sys)) text = text.slice(sys.length);
+      text = sanitize(text);
+
+      if (text.length < 30) {
+        const out2 = await gen(sys, { max_new_tokens: 80, do_sample: true, temperature: 1.0, top_p: 0.9, top_k: 60, repetition_penalty: 1.05, seed: Math.floor(Math.random() * 2**32) });
+        let t2 = out2?.[0]?.generated_text || '';
+        if (t2.startsWith(sys)) t2 = t2.slice(sys.length);
+        t2 = sanitize(t2);
+        if (t2.length >= 30) return t2;
+      }
+      return text || pickFallback();
+    }
+
+    async function generateUniqueText(tries = 4) {
+      for (let i = 0; i < tries; i++) {
+        const t = await generateAIText();
+        if (!seen.has(t)) { seen.add(t); return t; }
+      }
+      const t = await generateAIText();
+      seen.add(t);
+      return t;
+    }
+
+    function sanitize(s) {
+      s = s.replace(/[\r\n]+/g, ' ');
+      s = s.replace(/["`”“’]/g, '');
+      s = s.replace(/[^\x20-\x7E]/g, '');
+      s = s.replace(/\s{2,}/g, ' ').trim();
+      const m = s.match(/^[A-Za-z0-9 ,\-';:!\.?]{40,120}/);
+      if (m) s = m[0];
+      return s.slice(0, 100).trim();
+    }
+
+    function pickFallback() {
+      return FALLBACKS[Math.floor(Math.random() * FALLBACKS.length)];
+    }
+
+    // --- Typing game core ---
+    let target = '';
+    let startTime = null; let correctCount = 0; let typedCount = 0; let timerId = null;
+
+    function setPrompt(text) {
+      target = text;
+      seen.add(text);
+      els.prompt.innerHTML = '';
+      for (const ch of text) {
+        const span = document.createElement('span');
+        span.textContent = ch; span.className = 'pending';
+        els.prompt.appendChild(span);
+      }
+      els.input.value = ''; els.input.focus();
+      startTime = null; correctCount = 0; typedCount = 0; updateStats(0);
+      if (timerId) clearInterval(timerId);
+      timerId = setInterval(() => { if (startTime) updateStats(performance.now()); }, 120);
+    }
+
+    function updateStats(nowMs) {
+      const elapsedSec = startTime ? (nowMs - startTime) / 1000 : 0;
+      const minutes = elapsedSec / 60;
+      const wpm = minutes > 0 ? Math.round((typedCount / 5) / minutes) : 0;
+      const acc = typedCount > 0 ? Math.round((correctCount / typedCount) * 100) : 100;
+      els.wpm.textContent = String(wpm);
+      els.acc.textContent = acc + '%';
+      els.elapsed.textContent = elapsedSec.toFixed(1) + 's';
+    }
+
+    els.input.addEventListener('input', () => {
+      const val = els.input.value;
+      if (!startTime && val.length > 0) startTime = performance.now();
+      typedCount = val.length;
+      const spans = els.prompt.childNodes; correctCount = 0;
+      for (let i = 0; i < spans.length; i++) {
+        const ch = target[i] || ''; const s = spans[i];
+        if (i < val.length) { if (val[i] === ch) { s.className = 'correct'; correctCount++; } else { s.className = 'wrong'; } }
+        else { s.className = 'pending'; }
+      }
+      updateStats(performance.now());
+
+      if (val === target) { els.status.textContent = 'クリア！ 🎉 もう一問いきますか？'; els.input.blur(); }
+      else { if (!/^AI/.test(els.status.textContent)) { els.status.textContent = ''; } }
+    });
+
+    els.newBtn.addEventListener('click', async () => {
+      els.newBtn.disabled = true;
+      els.status.textContent = 'お題を生成中…';
+      try {
+        const text = await generateUniqueText();
+        setPrompt(text);
+        els.status.textContent = 'AI準備OK';
+      } catch (e) {
+        console.error(e);
+        setPrompt(pickFallback());
+        els.status.textContent = 'AI生成に失敗：内蔵お題を使用';
+      } finally { els.newBtn.disabled = false; }
+    });
+
+    els.fallbackBtn.addEventListener('click', () => { setPrompt(pickFallback()); els.status.textContent = '内蔵お題'; });
+    els.resetBtn.addEventListener('click', () => { setPrompt(target); els.status.textContent = ''; });
+
+    setPrompt(pickFallback());
+    ensureGenerator();
+
+    // --- 日本語お題メモ ---
+    // 1) FALLBACKS を日本語短文に変更
+    // 2) WebGPUが使えるなら WebLLM + 細めの日本語モデル
+    // 3) サーバAPIを使う場合はキーをフロントに置かない（Workers等でプロキシ）
+  </script>
+</body>
+</html>

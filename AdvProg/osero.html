@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>オセロ / リバーシ - Vanilla JS</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --board: #116149;
+      --board-dark: #0c4a38;
+      --accent: #ffd166;
+      --text: #e8eef7;
+      --muted: #9fb0c2;
+      --shadow: 0 10px 30px rgba(0,0,0,.4);
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+      background: radial-gradient(1200px 800px at 70% -10%, #1a2444 0%, var(--bg) 60%);
+      color: var(--text);
+      margin: 0; padding: 24px; display: grid; place-items: start center; min-height: 100svh;
+    }
+    .app { width: min(100%, 920px); display: grid; gap: 16px; }
+    header { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: center; justify-content: space-between; }
+    h1 { font-size: clamp(18px, 2.4vw, 24px); margin: 0; letter-spacing: .02em; }
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; }
+    button, select, .toggle {
+      background: #1e2a52; color: var(--text); border: 1px solid #2d3a6a; border-radius: 12px;
+      padding: 10px 14px; font-weight: 600; letter-spacing: .02em; cursor: pointer; box-shadow: var(--shadow);
+    }
+    button:hover, select:hover { filter: brightness(1.05); }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    .hud { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; }
+    .score { display: flex; gap: 10px; align-items: center; justify-content: flex-start; font-weight: 700; }
+    .disc { width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 2px 6px rgba(0,0,0,.6), 0 2px 4px rgba(0,0,0,.4); }
+    .black { background: #121212; }
+    .white { background: #f4f7fb; }
+    .turn { justify-self: center; display: inline-flex; align-items: center; gap: 10px; font-weight: 800; }
+    .status { justify-self: end; color: var(--muted); }
+
+    .board-wrap { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    .board {
+      width: min(86svmin, 720px); aspect-ratio: 1/1; margin-inline: auto;
+      background: linear-gradient(135deg, var(--board) 0%, var(--board-dark) 100%);
+      border-radius: 16px; box-shadow: var(--shadow); padding: 10px; position: relative;
+      display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); gap: 6px;
+    }
+    .cell {
+      background: rgba(255,255,255,.06); border-radius: 10px; position: relative; cursor: pointer;
+      display: grid; place-items: center; transition: transform .05s;
+    }
+    .cell:hover { transform: translateY(-1px); }
+    .cell.disabled { pointer-events: none; opacity: .6; }
+
+    .stone {
+      width: 80%; height: 80%; border-radius: 50%;
+      box-shadow: inset 0 8px 16px rgba(0,0,0,.55), 0 10px 18px rgba(0,0,0,.25);
+      position: relative;
+    }
+    .stone.black { background: radial-gradient(circle at 40% 35%, #2a2a2a, #111); }
+    .stone.white { background: radial-gradient(circle at 40% 35%, #fff, #cfd8e3); }
+    .hint::after {
+      content: ""; width: 18%; height: 18%; border-radius: 50%;
+      background: var(--accent); box-shadow: 0 0 0 3px rgba(0,0,0,.25);
+      display: block;
+    }
+
+    footer { color: var(--muted); text-align: center; font-size: 13px; }
+    .pill { background: rgba(255,255,255,.08); padding: 6px 10px; border-radius: 999px; }
+    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: rgba(0,0,0,.45); padding: 2px 6px; border-radius: 6px; }
+
+    @media (max-width: 540px) {
+      .hud { grid-template-columns: 1fr; gap: 8px; }
+      .status { justify-self: start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>オセロ / リバーシ（JavaScript）</h1>
+      <div class="controls">
+        <button id="resetBtn">リセット</button>
+        <button id="undoBtn" title="直前の手に戻す (Z)">一手戻す</button>
+        <label class="toggle" style="display:inline-flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="cpuToggle" /> vs CPU（白）
+        </label>
+        <select id="cpuLevel" title="CPUレベル">
+          <option value="easy">CPU: かんたん</option>
+          <option value="greedy">CPU: 強い（最大反転）</option>
+        </select>
+        <label class="toggle" style="display:inline-flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="hintToggle" checked /> 着手候補
+        </label>
+      </div>
+    </header>
+
+    <section class="hud">
+      <div class="score" id="scoreBlack"><span class="disc black"></span> 黒: <span>2</span></div>
+      <div class="turn" id="turnInfo"><span class="disc black"></span> 黒番</div>
+      <div class="status" id="status">はじめましょう！</div>
+    </section>
+
+    <section class="board-wrap">
+      <div id="board" class="board" role="grid" aria-label="オセロ盤 8x8"></div>
+    </section>
+
+    <footer>
+      <span class="pill">操作: マスをクリック / <span class="kbd">Z</span> 一手戻す / <span class="kbd">H</span> ヒント表示切替</span>
+    </footer>
+  </div>
+
+  <script>
+    // --- 定数とユーティリティ ---
+    const SIZE = 8;
+    const EMPTY = 0, BLACK = 1, WHITE = -1;
+    const DIRS = [
+      [-1,-1],[-1,0],[-1,1], [0,-1],[0,1], [1,-1],[1,0],[1,1]
+    ];
+
+    const $ = (sel) => document.querySelector(sel);
+    const boardEl = $('#board');
+    const scoreBlackEl = $('#scoreBlack span');
+    const turnInfoEl = $('#turnInfo');
+    const statusEl = $('#status');
+
+    const cpuToggle = $('#cpuToggle');
+    const cpuLevelSel = $('#cpuLevel');
+    const hintToggle = $('#hintToggle');
+    const undoBtn = $('#undoBtn');
+
+    // ゲーム状態
+    let state = {
+      board: Array.from({length: SIZE}, () => Array(SIZE).fill(EMPTY)),
+      turn: BLACK,
+      history: [], // 盤面と手番の履歴
+      lastMove: null,
+      cpuEnabled: false,
+    };
+
+    function cloneBoard(b){ return b.map(row => row.slice()); }
+
+    function init(){
+      // 初期配置
+      state.board = Array.from({length: SIZE}, () => Array(SIZE).fill(EMPTY));
+      const mid = SIZE/2;
+      state.board[mid-1][mid-1] = WHITE;
+      state.board[mid][mid] = WHITE;
+      state.board[mid-1][mid] = BLACK;
+      state.board[mid][mid-1] = BLACK;
+      state.turn = BLACK;
+      state.history = [];
+      state.lastMove = null;
+      render();
+      setStatus('はじめましょう！');
+    }
+
+    // 盤面レンダリング
+    function render(){
+      boardEl.innerHTML = '';
+      const valid = getValidMoves(state.board, state.turn);
+      for(let y=0; y<SIZE; y++){
+        for(let x=0; x<SIZE; x++){
+          const cell = document.createElement('button');
+          cell.className = 'cell';
+          cell.setAttribute('role','gridcell');
+          cell.setAttribute('aria-label', `${x+1}列 ${y+1}行`);
+          cell.dataset.x = x; cell.dataset.y = y;
+
+          const v = state.board[y][x];
+          if(v !== EMPTY){
+            const s = document.createElement('div');
+            s.className = 'stone ' + (v===BLACK? 'black':'white');
+            cell.appendChild(s);
+          } else if (hintToggle.checked && valid.some(m => m.x===x && m.y===y)) {
+            // ヒント表示
+            const h = document.createElement('div');
+            h.className = 'hint';
+            cell.appendChild(h);
+          }
+
+          cell.addEventListener('click', onCellClick);
+          boardEl.appendChild(cell);
+        }
+      }
+      updateHUD();
+    }
+
+    function updateHUD(){
+      const counts = countStones(state.board);
+      scoreBlackEl.textContent = counts.black;
+      const turnDisc = `<span class="disc ${state.turn===BLACK? 'black':'white'}"></span>`;
+      turnInfoEl.innerHTML = `${turnDisc} ${state.turn===BLACK? '黒番':'白番'}`;
+
+      const valid = getValidMoves(state.board, state.turn);
+      const oppValid = getValidMoves(state.board, -state.turn);
+      const isFull = counts.black + counts.white === SIZE*SIZE;
+
+      if(valid.length === 0){
+        if(oppValid.length === 0 || isFull){
+          const winner = counts.black === counts.white ? '引き分け' : (counts.black > counts.white ? '黒の勝ち' : '白の勝ち');
+          setStatus(`ゲーム終了：${winner}（黒 ${counts.black} - 白 ${counts.white}）`);
+          boardEl.querySelectorAll('.cell').forEach(c=>c.classList.add('disabled'));
+        } else {
+          // パス
+          setStatus('打てる手がないためパス');
+          state.turn *= -1;
+          // 即CPUに渡す場合
+          maybeCpuMove();
+          render();
+        }
+      } else {
+        setStatus(`${valid.length} 通りの手`);
+      }
+    }
+
+    function setStatus(msg){ statusEl.textContent = msg; }
+
+    function inBoard(x,y){ return x>=0 && y>=0 && x<SIZE && y<SIZE; }
+
+    function flipsForMove(board, x, y, player){
+      if(board[y][x] !== EMPTY) return [];
+      let flips = [];
+      for(const [dx,dy] of DIRS){
+        let nx = x+dx, ny=y+dy; let line=[]; let touched=false;
+        while(inBoard(nx,ny) && board[ny][nx] === -player){
+          line.push([nx,ny]); nx+=dx; ny+=dy; touched=true;
+        }
+        if(touched && inBoard(nx,ny) && board[ny][nx] === player){
+          flips = flips.concat(line);
+        }
+      }
+      return flips;
+    }
+
+    function getValidMoves(board, player){
+      const moves=[];
+      for(let y=0;y<SIZE;y++){
+        for(let x=0;x<SIZE;x++){
+          const flips = flipsForMove(board,x,y,player);
+          if(flips.length>0) moves.push({x,y,flips});
+        }
+      }
+      return moves;
+    }
+
+    function applyMove(board, x, y, player){
+      const flips = flipsForMove(board,x,y,player);
+      if(flips.length===0) return false;
+      board[y][x] = player;
+      for(const [fx,fy] of flips){ board[fy][fx] = player; }
+      return true;
+    }
+
+    function countStones(board){
+      let black=0, white=0;
+      for(const row of board){
+        for(const v of row){ if(v===BLACK) black++; else if(v===WHITE) white++; }
+      }
+      return {black, white};
+    }
+
+    // クリック処理
+    function onCellClick(e){
+      const x = +e.currentTarget.dataset.x;
+      const y = +e.currentTarget.dataset.y;
+      const before = cloneBoard(state.board);
+      if(applyMove(state.board, x, y, state.turn)){
+        state.history.push({board: before, turn: state.turn, lastMove: state.lastMove});
+        state.lastMove = {x,y,player: state.turn};
+        state.turn *= -1;
+        render();
+        maybeCpuMove();
+      }
+    }
+
+    // CPU 手番（白）
+    function maybeCpuMove(){
+      if(!state.cpuEnabled) return;
+      if(state.turn !== WHITE) return;
+      // ほんの少しウェイトを入れて自然に
+      setTimeout(()=>{
+        const move = pickCpuMove(state.board, cpuLevelSel.value);
+        if(!move){ render(); return; }
+        const before = cloneBoard(state.board);
+        applyMove(state.board, move.x, move.y, WHITE);
+        state.history.push({board: before, turn: WHITE, lastMove: state.lastMove});
+        state.lastMove = {x: move.x, y: move.y, player: WHITE};
+        state.turn = BLACK;
+        render();
+      }, 180);
+    }
+
+    function pickCpuMove(board, level){
+      const moves = getValidMoves(board, WHITE);
+      if(moves.length===0) return null;
+      if(level === 'easy'){
+        return moves[Math.floor(Math.random()*moves.length)];
+      }
+      // greedy: 反転枚数最大、同数なら角優先
+      const scoreMove = (m)=>{
+        let score = m.flips.length;
+        // 角ボーナス
+        if((m.x===0||m.x===SIZE-1) && (m.y===0||m.y===SIZE-1)) score += 10;
+        // 辺ボーナス
+        if(m.x===0||m.x===SIZE-1||m.y===0||m.y===SIZE-1) score += 2;
+        return score;
+      };
+      return moves.reduce((best,m)=> scoreMove(m)>scoreMove(best)? m:best, moves[0]);
+    }
+
+    // 一手戻す
+    function undo(){
+      if(state.history.length===0) return;
+      const prev = state.history.pop();
+      state.board = cloneBoard(prev.board);
+      state.turn = prev.turn;
+      state.lastMove = prev.lastMove;
+      render();
+    }
+
+    // イベント類
+    $('#resetBtn').addEventListener('click', init);
+    undoBtn.addEventListener('click', undo);
+    cpuToggle.addEventListener('change', ()=>{
+      state.cpuEnabled = cpuToggle.checked;
+      // 人間 vs CPU では CPU=白 に固定
+      if(state.cpuEnabled && state.turn===WHITE){ maybeCpuMove(); }
+    });
+    cpuLevelSel.addEventListener('change', ()=> { /* no-op */ });
+    hintToggle.addEventListener('change', render);
+
+    // キーボード
+    window.addEventListener('keydown', (e)=>{
+      if(e.key.toLowerCase()==='z') undo();
+      if(e.key.toLowerCase()==='h') { hintToggle.checked = !hintToggle.checked; render(); }
+    });
+
+    // 初期化
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>マウス追従スネーク</title>
+  <style>
+    :root {
+      --bg1: #0f1226;
+      --bg2: #121a3a;
+      --accent: #7cf1c8;
+      --accent2: #66a6ff;
+      --danger: #ff6b6b;
+    }
+    html, body {
+      height: 100%;
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, "Apple Color Emoji", "Segoe UI Emoji";
+      color: #e6f3ff;
+      background: radial-gradient(1200px 800px at 20% 10%, rgba(102,166,255,0.15), transparent 60%),
+                  radial-gradient(900px 700px at 80% 20%, rgba(124,241,200,0.12), transparent 60%),
+                  linear-gradient(180deg, var(--bg1), var(--bg2));
+      overflow: hidden;
+    }
+    .hud {
+      position: fixed;
+      inset: 16px auto auto 16px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      z-index: 2;
+      user-select: none;
+    }
+    .pill {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      backdrop-filter: blur(6px);
+      border-radius: 999px;
+      padding: 8px 14px;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.2);
+      font-weight: 600;
+      letter-spacing: .2px;
+    }
+    .btn {
+      cursor: pointer;
+      transition: transform .1s ease, box-shadow .2s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+
+    canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+
+    .overlay {
+      position: fixed; inset: 0; display: grid; place-items: center; z-index: 3;
+      background: linear-gradient(180deg, rgba(0,0,0,.3), rgba(0,0,0,.5));
+      visibility: hidden; opacity: 0; transition: opacity .25s ease, visibility .25s ease;
+    }
+    .overlay.show { visibility: visible; opacity: 1; }
+    .panel {
+      width: min(560px, calc(100vw - 40px));
+      background: rgba(18,24,52,.9);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 20px;
+      box-shadow: 0 30px 80px rgba(0,0,0,.45);
+      padding: 28px 24px;
+      text-align: center;
+    }
+    .title { font-size: clamp(20px, 3.4vw, 28px); margin: 0 0 6px; }
+    .subtitle { opacity: .85; margin: 0 0 18px; }
+    .big { font-size: 42px; font-weight: 800; margin: 8px 0 18px; }
+    .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .primary {
+      background: linear-gradient(90deg, var(--accent2), var(--accent));
+      color: #00121a; border: none;
+      box-shadow: 0 8px 26px rgba(102,166,255,.35);
+    }
+    .ghost { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18); }
+
+    .tips { font-size: 12px; opacity: .75; margin-top: 14px; }
+  </style>
+</head>
+<body>
+  <div class="hud">
+    <div id="score" class="pill">🍬 0</div>
+    <button id="restartBtn" class="pill btn ghost" title="Rキーでも再スタート">↻ 再スタート</button>
+  </div>
+
+  <canvas id="game"></canvas>
+
+  <div class="overlay" id="gameOver">
+    <div class="panel">
+      <h2 class="title">ゲームオーバー！</h2>
+      <div class="subtitle">スネークが自分の体にぶつかってしまった…</div>
+      <div class="big" id="finalScore">🍬 0</div>
+      <div class="row">
+        <button class="pill btn primary" id="again">もう一度あそぶ</button>
+        <button class="pill btn ghost" id="how">遊び方</button>
+      </div>
+      <div class="tips">マウス（またはタッチ）にヘビの頭が追従します。お菓子を食べるとスコア＋蛇が長くなります。<br/>頭が体に当たったら終了。Rキーでリスタート。</div>
+    </div>
+  </div>
+
+  <script>
+  ;(() => {
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const overlay = document.getElementById('gameOver');
+    const finalScoreEl = document.getElementById('finalScore');
+    const againBtn = document.getElementById('again');
+    const restartBtn = document.getElementById('restartBtn');
+    const howBtn = document.getElementById('how');
+
+    const DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+
+    const state = {
+      w: 0, h: 0,
+      target: { x: 0, y: 0 },
+      snake: [],
+      radius: 9,          // 見た目の太さ/半径
+      segmentGap: 12,     // セグメント間隔
+      speed: 360,         // ヘッドの速度(px/秒)
+      growQueue: 0,       // 増やす残りセグメント数
+      food: { x: 0, y: 0, r: 10 },
+      score: 0,
+      running: true,
+    };
+
+    function resize() {
+      const { innerWidth: W, innerHeight: H } = window;
+      canvas.width = Math.floor(W * DPR);
+      canvas.height = Math.floor(H * DPR);
+      canvas.style.width = W + 'px';
+      canvas.style.height = H + 'px';
+      state.w = canvas.width;
+      state.h = canvas.height;
+      // 初期ターゲットは中央
+      state.target.x = state.w / 2;
+      state.target.y = state.h / 2;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // マウス/タッチ入力
+    function setTargetFromEvent(e) {
+      let x, y;
+      if (e.touches && e.touches[0]) {
+        x = e.touches[0].clientX; y = e.touches[0].clientY;
+      } else { x = e.clientX; y = e.clientY; }
+      state.target.x = x * DPR; state.target.y = y * DPR;
+    }
+    window.addEventListener('mousemove', setTargetFromEvent);
+    window.addEventListener('touchmove', setTargetFromEvent, { passive: true });
+
+    // 初期化
+    function init() {
+      state.snake = [];
+      const start = { x: state.w/2, y: state.h/2 };
+      const initLen = 16; // 初期セグメント数
+      for (let i=0;i<initLen;i++) {
+        state.snake.push({ x: start.x - i*state.segmentGap, y: start.y });
+      }
+      state.score = 0;
+      state.growQueue = 0;
+      state.running = true;
+      spawnFood(true);
+      updateScore();
+      hideOverlay();
+    }
+
+    function updateScore() { scoreEl.textContent = `🍬 ${state.score}`; }
+
+    function showOverlay() {
+      finalScoreEl.textContent = `🍬 ${state.score}`;
+      overlay.classList.add('show');
+    }
+    function hideOverlay() { overlay.classList.remove('show'); }
+
+    function spawnFood(first=false) {
+      const margin = 40 * DPR;
+      let x, y; let tries = 0;
+      do {
+        x = margin + Math.random() * (state.w - margin*2);
+        y = margin + Math.random() * (state.h - margin*2);
+        tries++;
+        // ヘッドとの距離が近すぎないように
+      } while (!first && dist(x, y, state.snake[0].x, state.snake[0].y) < 140*DPR && tries < 80);
+      state.food.x = x; state.food.y = y; state.food.r = 11 * DPR;
+    }
+
+    function dist(ax, ay, bx, by) {
+      const dx = ax - bx, dy = ay - by; return Math.hypot(dx, dy);
+    }
+
+    function step(dt) {
+      if (!state.running) return;
+      const head = state.snake[0];
+
+      // ヘッド：ターゲットへ移動
+      const dx = state.target.x - head.x;
+      const dy = state.target.y - head.y;
+      const len = Math.hypot(dx, dy);
+      const maxMove = state.speed * DPR * dt;
+      if (len > 0.01) {
+        const mv = Math.min(maxMove, len);
+        head.x += (dx/len) * mv;
+        head.y += (dy/len) * mv;
+      }
+      // 画面内に収める（ふちパディング）
+      const pad = state.radius*DPR + 2;
+      head.x = Math.max(pad, Math.min(state.w - pad, head.x));
+      head.y = Math.max(pad, Math.min(state.h - pad, head.y));
+
+      // 体：前のセグメントにぴったり追従（間隔一定）
+      for (let i=1;i<state.snake.length;i++) {
+        const prev = state.snake[i-1];
+        const cur = state.snake[i];
+        const vx = cur.x - prev.x;
+        const vy = cur.y - prev.y;
+        const d = Math.hypot(vx, vy) || 0.0001;
+        const nx = vx / d, ny = vy / d;
+        // prev から gap 離れた位置にスナップ（ラインを保つ）
+        cur.x = prev.x + nx * state.segmentGap * DPR;
+        cur.y = prev.y + ny * state.segmentGap * DPR;
+      }
+
+      // 成長キュー処理：最後尾に複製を追加
+      while (state.growQueue > 0) {
+        const tail = state.snake[state.snake.length-1];
+        state.snake.push({ x: tail.x, y: tail.y });
+        state.growQueue--;
+      }
+
+      // お菓子取得
+      if (dist(head.x, head.y, state.food.x, state.food.y) < state.food.r + state.radius*DPR*0.9) {
+        state.score += 1;
+        updateScore();
+        state.growQueue += 6; // 食べると6セグメント伸びる
+        spawnFood();
+      }
+
+      // 自己衝突（ヘッド vs 体）
+      const collideThresh = state.radius * DPR * 0.92;
+      for (let i=6;i<state.snake.length;i++) { // 近すぎる部分は除外
+        if (dist(head.x, head.y, state.snake[i].x, state.snake[i].y) < collideThresh) {
+          state.running = false;
+          showOverlay();
+          break;
+        }
+      }
+    }
+
+    function draw() {
+      // 背景（軽い残像なしのクリア）
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+
+      // お菓子（シンプルな包み紙キャンディ）
+      drawCandy(state.food.x, state.food.y, state.food.r);
+
+      // スネーク
+      drawSnake();
+    }
+
+    function drawSnake() {
+      if (state.snake.length < 2) return;
+      const r = state.radius * DPR;
+
+      // 背景ライン（外周の柔らかい縁）
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      // グラデーション（尻尾→頭）
+      const head = state.snake[0];
+      const tail = state.snake[state.snake.length-1];
+      const grad = ctx.createLinearGradient(tail.x, tail.y, head.x, head.y);
+      grad.addColorStop(0, 'rgba(124,241,200,0.85)'); // テイル側
+      grad.addColorStop(1, 'rgba(102,166,255,0.95)'); // ヘッド側
+
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = r*2;
+
+      ctx.beginPath();
+      ctx.moveTo(state.snake[0].x, state.snake[0].y);
+      for (let i=1;i<state.snake.length;i++) ctx.lineTo(state.snake[i].x, state.snake[i].y);
+      ctx.stroke();
+
+      // ヘッド円 + 目
+      ctx.fillStyle = '#e9f7ff';
+      ctx.beginPath(); ctx.arc(head.x, head.y, r*0.95, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#0b1930';
+      const eyeOff = r*0.42;
+      ctx.beginPath(); ctx.arc(head.x + eyeOff, head.y - eyeOff*0.4, r*0.22, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(head.x + eyeOff*0.4, head.y + eyeOff*0.2, r*0.22, 0, Math.PI*2); ctx.fill();
+
+      ctx.restore();
+    }
+
+    function drawCandy(x, y, R) {
+      ctx.save();
+      // 包み紙
+    // 包み紙（左右反転版）
+    ctx.fillStyle = 'rgba(255,107,107,0.95)';
+
+    // 左側（三角を左右反転）
+    ctx.beginPath();
+    ctx.moveTo(x - R*1.2, y);           // 先端（内側）
+    ctx.lineTo(x - R*1.9, y - R*0.9);   // 外側上
+    ctx.lineTo(x - R*1.9, y + R*0.9);   // 外側下
+    ctx.closePath();
+    ctx.fill();
+
+    // 右側（三角を左右反転）
+    ctx.beginPath();
+    ctx.moveTo(x + R*1.2, y);           // 先端（内側）
+    ctx.lineTo(x + R*1.9, y - R*0.9);   // 外側上
+    ctx.lineTo(x + R*1.9, y + R*0.9);   // 外側下
+    ctx.closePath();
+    ctx.fill();
+
+
+      // 本体
+      const g = ctx.createRadialGradient(x - R*0.4, y - R*0.4, R*0.2, x, y, R);
+      g.addColorStop(0, '#ffd2d2');
+      g.addColorStop(1, '#ff7a7a');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI*2); ctx.fill();
+
+      // ストライプ
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+      ctx.lineWidth = Math.max(1, R*0.18);
+      for (let a=-Math.PI; a<Math.PI; a+=Math.PI/3) {
+        ctx.beginPath();
+        ctx.arc(x, y, R*0.85, a, a + Math.PI/2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    let last = performance.now();
+    function loop(now) {
+      const dt = Math.min(0.033, (now - last) / 1000);
+      last = now;
+      step(dt);
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    // 操作系
+    againBtn.addEventListener('click', () => init());
+    restartBtn.addEventListener('click', () => init());
+    howBtn.addEventListener('click', () => alert('マウス（またはタッチ）にヘビの頭が追従します。お菓子を食べるとスコア＋蛇が長くなります。頭が体に当たったらゲームオーバー。Rキーで再スタート。'));
+    window.addEventListener('keydown', (e) => {
+      if (e.key.toLowerCase() === 'r') init();
+    });
+
+    // スタート
+    init();
+    requestAnimationFrame(loop);
+  })();
+  </script>
+</body>
+</html>
