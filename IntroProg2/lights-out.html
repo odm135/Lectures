@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lights Out</title>
+  <style>
+  :root{
+  --bg: #0f1216;
+  --panel: #161b22;
+  --accent: #4cc9f0;
+  --accent-weak: #4361ee;
+  --text: #e6edf3;
+  --muted: #9aa4b2;
+  --on: #f8e16c;
+  --off: #1f2630;
+  --success: #2ecc71;
+  --ui-space: 210px; /* space reserved for header/hud */
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: radial-gradient(1200px 800px at 20% -10%, #1b2330 0%, #0f1216 60%);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic UI', 'Yu Gothic', 'Meiryo', sans-serif;
+}
+
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: 1rem clamp(1rem, 4vw, 2rem);
+  background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(1.25rem, 2.2vw, 1.75rem);
+  letter-spacing: .02em;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+
+select, button {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,.08);
+  padding: .5rem .75rem;
+  border-radius: .75rem;
+  font-size: 0.95rem;
+  transition: transform .05s ease, background .2s ease, border-color .2s ease, opacity .2s ease;
+}
+
+button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+button:hover:not(:disabled), select:hover {
+  border-color: rgba(255,255,255,.18);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+main {
+  max-width: 980px;
+  margin: 1.25rem auto;
+  padding: 0 clamp(1rem, 4vw, 2rem);
+}
+
+.hud {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: .75rem;
+  color: var(--muted);
+}
+
+.status { min-height: 1.5em; }
+
+.board {
+  --size: 5;
+  display: grid;
+  grid-template-columns: repeat(var(--size), minmax(0, 1fr));
+  gap: clamp(2px, 1vmin, 10px);
+  background: rgba(255,255,255,.02);
+  border: 1px solid rgba(255,255,255,.06);
+  padding: clamp(4px, 1.2vw, 14px);
+  border-radius: 1rem;
+  box-shadow: 0 10px 30px rgba(0,0,0,.25) inset, 0 8px 30px rgba(0,0,0,.25);
+  /* --- responsive size: always fits without zoom --- */
+  width: min(92vmin, 80vh, 640px);
+  margin-left: auto;
+  margin-right: auto;
+}
+/* Prefer svh on modern browsers for mobile UI */
+@supports (width: min(92vmin, 80svh, 640px)) {
+  .board { width: min(92vmin, 80svh, 640px); }
+}
+
+.tile {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: .6rem;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+  border: 1px solid rgba(255,255,255,.06);
+  background: var(--off);
+  box-shadow: 0 2px 8px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.02);
+  transition: background .15s ease, transform .04s ease;
+}
+
+.tile.on {
+  background: radial-gradient(180px 180px at 50% 35%, #fff6b3 0%, var(--on) 40%, #c5a93a 85%);
+  box-shadow: 0 6px 18px rgba(248, 225, 108, .35), inset 0 0 0 1px rgba(255,255,255,.05);
+}
+
+.tile:active { transform: translateY(1px) scale(.995); }
+
+.tile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.rules { margin-top: 1rem; color: var(--muted); }
+.rules summary { cursor: pointer; padding: .5rem 0; color: var(--text); }
+
+.footer { padding: 2rem; text-align: center; color: var(--muted); font-size: .9rem; }
+
+.board.win .tile.on { animation: pulse 0.8s ease-in-out infinite alternate; }
+@keyframes pulse { from { filter: saturate(1) brightness(1); } to { filter: saturate(1.2) brightness(1.15); } }
+
+/* compact layout for small screens */
+@media (max-width: 640px) {
+  .topbar { padding: .6rem 1rem; }
+  main { margin: .6rem auto; }
+  select, button { padding: .4rem .6rem; }
+  .footer { padding: 1rem; }
+}
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <h1>Lights Out</h1>
+    <div class="controls">
+      <label for="size">サイズ：</label>
+      <select id="size" aria-label="グリッドサイズ"></select>
+      <button id="new">新しいゲーム</button>
+      <button id="reset" disabled>リセット</button>
+      <button id="undo" disabled>一手戻す</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="hud" aria-live="polite">
+      <div>手数: <span id="moves">0</span></div>
+      <div id="status" class="status">準備OK</div>
+    </section>
+
+    <section id="board" class="board" role="grid" aria-label="Lights Out 盤面"></section>
+
+    <details class="rules">
+      <summary>遊び方</summary>
+      <ol>
+        <li>タイルをクリック（またはエンター/スペース）すると、そのタイルと上下左右が反転します。</li>
+        <li>全て消灯（黒）にできたらクリアです。</li>
+        <li>上のセレクトで<strong>サイズ</strong>を変えられます（3×3〜10×10）。</li>
+      </ol>
+      <p class="note">※ 盤面は必ず解けるようにランダム生成しています。</p>
+    </details>
+  </main>
+
+  <footer class="footer">
+    <span>1ファイル版（レスポンシブ調整）</span>
+  </footer>
+
+  <script>
+  (() => {
+  'use strict';
+
+  // Elements
+  const boardEl = document.getElementById('board');
+  const sizeSel = document.getElementById('size');
+  const newBtn = document.getElementById('new');
+  const resetBtn = document.getElementById('reset');
+  const undoBtn = document.getElementById('undo');
+  const movesEl = document.getElementById('moves');
+  const statusEl = document.getElementById('status');
+
+  // Game state
+  let size = 5;
+  let board = [];          // boolean matrix: true = ON, false = OFF
+  let initialBoard = [];   // for reset
+  let moves = 0;
+  let undoStack = [];      // stack of {r,c}
+
+  // Utils
+  const rng = (() => {
+    // Prefer crypto randomness
+    if (window.crypto && crypto.getRandomValues) {
+      return (n) => crypto.getRandomValues(new Uint32Array(1))[0] % n;
+    }
+    return (n) => Math.floor(Math.random() * n);
+  })();
+
+  function setSizeVariable(n) {
+    boardEl.style.setProperty('--size', String(n));
+  }
+
+  function createMatrix(n, fill=false) {
+    return Array.from({length: n}, () => Array(n).fill(fill));
+  }
+
+  function cloneMatrix(m) {
+    return m.map(row => row.slice());
+  }
+
+  function inBounds(r, c) {
+    return r >= 0 && r < size && c >= 0 && c < size;
+  }
+
+  function toggle(r, c, mutateBoard = board) {
+    // Toggle (r,c) and cross neighbors
+    const delta = [[0,0],[1,0],[-1,0],[0,1],[0,-1]];
+    for (const [dr, dc] of delta) {
+      const nr = r + dr, nc = c + dc;
+      if (inBounds(nr, nc)) {
+        mutateBoard[nr][nc] = !mutateBoard[nr][nc];
+      }
+    }
+  }
+
+  function isSolved(m = board) {
+    for (let r = 0; r < size; r++) {
+      for (let c = 0; c < size; c++) {
+        if (m[r][c]) return false;
+      }
+    }
+    return true;
+  }
+
+  function render() {
+    // Update DOM tiles according to board[][]
+    const tiles = boardEl.querySelectorAll('.tile');
+    let i = 0;
+    for (let r = 0; r < size; r++) {
+      for (let c = 0; c < size; c++) {
+        const t = tiles[i++];
+        if (!t) continue;
+        t.classList.toggle('on', board[r][c]);
+        t.setAttribute('aria-pressed', board[r][c] ? 'true' : 'false');
+      }
+    }
+    movesEl.textContent = String(moves);
+  }
+
+  function rebuildBoardDOM() {
+    boardEl.innerHTML = '';
+    setSizeVariable(size);
+    for (let r = 0; r < size; r++) {
+      for (let c = 0; c < size; c++) {
+        const btn = document.createElement('button');
+        btn.className = 'tile';
+        btn.role = 'gridcell';
+        btn.setAttribute('role', 'gridcell');
+        btn.setAttribute('tabindex', '0');
+        btn.dataset.r = String(r);
+        btn.dataset.c = String(c);
+        btn.addEventListener('click', onTileClick);
+        btn.addEventListener('keydown', (e) => {
+          // Enter/Space to toggle. Arrow keys move focus.
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onTileClick.call(btn, e);
+          } else if (e.key.startsWith('Arrow')) {
+            e.preventDefault();
+            const rr = Number(btn.dataset.r);
+            const cc = Number(btn.dataset.c);
+            let nr = rr, nc = cc;
+            if (e.key === 'ArrowUp') nr = Math.max(0, rr - 1);
+            if (e.key === 'ArrowDown') nr = Math.min(size - 1, rr + 1);
+            if (e.key === 'ArrowLeft') nc = Math.max(0, cc - 1);
+            if (e.key === 'ArrowRight') nc = Math.min(size - 1, cc + 1);
+            const next = boardEl.querySelector(`.tile[data-r="${nr}"][data-c="${nc}"]`);
+            next?.focus();
+          }
+        });
+        boardEl.appendChild(btn);
+      }
+    }
+  }
+
+  function onTileClick(e) {
+    if (boardEl.classList.contains('win')) return; // prevent extra input after win
+    const r = Number(this.dataset.r);
+    const c = Number(this.dataset.c);
+    toggle(r, c, board);
+    undoStack.push({r, c});
+    moves++;
+    render();
+    if (isSolved()) {
+      statusEl.textContent = 'クリア！おめでとう 🎉';
+      boardEl.classList.add('win');
+      resetBtn.disabled = false;
+      undoBtn.disabled = true;
+    }
+  }
+
+  function scramble() {
+    // Start from all OFF, then apply random valid moves so it's solvable
+    board = createMatrix(size, false);
+    const mixMoves = Math.max(size * size, 10);
+    for (let i = 0; i < mixMoves; i++) {
+      const r = rng(size);
+      const c = rng(size);
+      toggle(r, c, board);
+    }
+    // Avoid trivial already-solved board
+    if (isSolved(board)) {
+      toggle(rng(size), rng(size), board);
+    }
+    initialBoard = cloneMatrix(board);
+    undoStack = [];
+    moves = 0;
+    boardEl.classList.remove('win');
+    statusEl.textContent = 'すべて消灯させよう';
+    resetBtn.disabled = false;
+    undoBtn.disabled = true;
+  }
+
+  function resetBoard() {
+    board = cloneMatrix(initialBoard);
+    moves = 0;
+    undoStack = [];
+    statusEl.textContent = '初期状態に戻しました';
+    boardEl.classList.remove('win');
+    render();
+    undoBtn.disabled = true;
+  }
+
+  function undo() {
+    const last = undoStack.pop();
+    if (!last) return;
+    toggle(last.r, last.c, board);
+    moves = Math.max(0, moves - 1);
+    statusEl.textContent = '一手戻しました';
+    render();
+    undoBtn.disabled = undoStack.length === 0;
+  }
+
+  function newGame() {
+    size = Number(sizeSel.value);
+    rebuildBoardDOM();
+    scramble();
+    render();
+  }
+
+  // Setup size options
+  function initSelect() {
+    const last = Number(localStorage.getItem('lightsout:size')) || 5;
+    for (let n = 3; n <= 10; n++) {
+      const opt = document.createElement('option');
+      opt.value = String(n);
+      opt.textContent = `${n} × ${n}`;
+      if (n === last) opt.selected = true;
+      sizeSel.appendChild(opt);
+    }
+    size = Number(sizeSel.value);
+    sizeSel.addEventListener('change', () => {
+      localStorage.setItem('lightsout:size', sizeSel.value);
+      newGame();
+    });
+  }
+
+  // Bind buttons
+  function bindUI() {
+    newBtn.addEventListener('click', () => {
+      newGame();
+    });
+    resetBtn.addEventListener('click', () => {
+      resetBoard();
+    });
+    undoBtn.addEventListener('click', () => {
+      undo();
+    });
+    // Enable/disable undo by observing stack length
+    const undoObserver = new MutationObserver(() => {
+      undoBtn.disabled = undoStack.length === 0 || boardEl.classList.contains('win');
+    });
+    undoObserver.observe(boardEl, { attributes: true, subtree: false });
+  }
+
+  // Initialize
+  initSelect();
+  bindUI();
+  rebuildBoardDOM();
+  scramble();
+  render();
+})();
+  </script>
+</body>
+</html>
