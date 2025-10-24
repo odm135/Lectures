@@ -1,0 +1,8 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.wrap { max-width: 720px; margin: 32px auto; padding: 0 16px; }
+#gen { padding: 8px 12px; font-size: 14px; }
+.out {
+  margin-top: 10px; padding: 12px; min-height: 80px;
+  border: 1px solid #ddd; border-radius: 8px; white-space: pre-wrap; word-break: break-word;
+}

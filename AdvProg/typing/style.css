@@ -1,0 +1,120 @@
+:root{
+  --bg:#0b0f14;
+  --panel:#121821;
+  --panel-2:#0f141b;
+  --text:#e7eef7;
+  --muted:#9fb0c3;
+  --accent:#6aa6ff;
+  --accent-2:#2dd4bf;
+  --danger:#ff6b6b;
+  --ok:#7ee787;
+  --shadow: 0 10px 30px rgba(0,0,0,.35);
+  --radius:16px;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", Meiryo, "Noto Sans JP", sans-serif;
+  background: radial-gradient(1200px 600px at 10% -10%, #142034, transparent 50%),
+              radial-gradient(1000px 500px at 110% 10%, #13222f, transparent 50%),
+              var(--bg);
+  color:var(--text);
+}
+
+.app{max-width:980px;margin:40px auto;padding:0 16px}
+.app__header h1{margin:0 0 6px;font-weight:800;letter-spacing:.3px}
+.app__sub{margin:0;color:var(--muted)}
+.app__footer{margin:32px 0;color:var(--muted);text-align:center}
+
+.card{
+  background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+  border: 1px solid rgba(255,255,255,.06);
+  box-shadow: var(--shadow);
+  border-radius: var(--radius);
+  padding:24px;
+  margin-top:20px;
+}
+.card--muted{background: linear-gradient(180deg, rgba(255,255,255,.015), rgba(255,255,255,.005))}
+
+.controls{display:flex;flex-direction:column;gap:16px}
+.controls__row{display:flex;align-items:center;gap:12px}
+.controls__row.gap{gap:8px;flex-wrap:wrap}
+
+.controls__grid{
+  display:grid;
+  grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
+  gap:12px;
+}
+.hidden{display:none}
+
+.field{display:flex;flex-direction:column;gap:6px}
+.field input{
+  background:var(--panel-2);
+  border:1px solid rgba(255,255,255,.08);
+  color:var(--text);
+  padding:10px 12px;border-radius:10px;outline:none;
+}
+.field input:focus{border-color:var(--accent)}
+
+.switch{position:relative;display:inline-block;width:46px;height:26px}
+.switch input{opacity:0;width:0;height:0}
+.slider{
+  position:absolute;cursor:pointer;inset:0;background:#3a4656;border-radius:999px;transition:.2s;
+}
+.slider:before{
+  content:"";position:absolute;height:20px;width:20px;left:3px;top:3px;background:white;border-radius:50%;transition:.2s;
+}
+.switch input:checked + .slider{background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+.switch input:checked + .slider:before{transform:translateX(20px)}
+
+.btn{
+  background:var(--panel-2);
+  border:1px solid rgba(255,255,255,.08);
+  color:var(--text); padding:10px 14px; border-radius:12px; cursor:pointer;
+}
+.btn:hover{filter:brightness(1.1)}
+.btn--primary{background:linear-gradient(90deg, var(--accent), var(--accent-2)); border:none}
+.btn--ghost{background:transparent;border:1px dashed rgba(255,255,255,.2)}
+
+.prompt{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.prompt__label{color:var(--muted);font-size:14px}
+.prompt__text{
+  min-height:72px;line-height:1.8;background:var(--panel);
+  border:1px solid rgba(255,255,255,.06);
+  padding:14px;border-radius:12px;font-size:18px;letter-spacing:.2px;word-wrap:break-word
+}
+.prompt__text .ok{color:var(--ok)}
+.prompt__text .bad{background:linear-gradient(transparent 60%, rgba(255,107,107,.35) 60%)}
+.prompt__text .caret{
+  border-left:2px solid var(--accent);
+  margin-left:-1px;
+  animation:blink 1s step-end infinite;
+}
+@keyframes blink{50%{border-color:transparent}}
+
+.progress{height:8px;background:#202938;border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,.06)}
+.progress__bar{height:100%;background:linear-gradient(90deg, var(--accent), var(--accent-2));transition:width .1s}
+
+.typing__area{
+  width:100%;min-height:120px;margin-top:10px;
+  background:var(--panel);
+  border:1px solid rgba(255,255,255,.06);
+  color:var(--text); padding:14px;border-radius:12px;resize:vertical
+}
+.typing__area:disabled{opacity:.6;cursor:not-allowed}
+
+.stats{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px
+}
+.stat{
+  background:var(--panel-2);border:1px solid rgba(255,255,255,.06);
+  padding:12px;border-radius:12px;text-align:center
+}
+.stat__label{color:var(--muted);font-size:12px}
+.stat__value{font-size:22px;font-weight:700;margin-top:6px}
+
+@media (max-width:640px){
+  .stats{grid-template-columns:repeat(2,1fr)}
+}
