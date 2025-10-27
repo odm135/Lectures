@@ -9,26 +9,27 @@
 
   :root{
     --bg:#010409;
-    --txt:#8bdcff;      /* 濃いめの水色（本文） */
-    --neon:#18c6ff;     /* アクセント */
+    --txt:#8bdcff;
+    --neon:#18c6ff;
     --neon-soft:#18c6ff2b;
-    --ok:#9ff0d4;       /* 正解メッセージ */
+    --ok:#9ff0d4;
     --gap: clamp(22px, 5vw, 52px);
 
-    /* Dパッド（モバイルで自動調整） */
-    --pad-size: clamp(54px, 15vw, 72px);
+    /* D-pad sizes */
+    --pad-size: clamp(52px, 14.5vw, 68px);
     --pad-gap: clamp(8px, 3.2vw, 14px);
   }
 
-  /* ==== 背景（控えめグリッド、縦線なし） ==== */
+  /* ==== Background (subtle grid) ==== */
   body{
     margin:0; min-height:100svh; color:var(--txt);
     font-family:'Orbitron',sans-serif;
     background:var(--bg);
-    display:flex; align-items:center; justify-content:center;  /* PCは中央配置 */
+    display:flex; align-items:center; justify-content:center;  /* desktop center */
     padding: calc(var(--gap) * 1.6) var(--gap);
     -webkit-user-select:none; user-select:none; touch-action:manipulation;
-    overflow:hidden; position:relative;
+    overflow-x:hidden;           /* ← 縦スクロールは必要に応じ許可する */
+    position:relative;
   }
   body::before{
     content:""; position:absolute; inset:0; z-index:-2;
@@ -43,7 +44,7 @@
     100%{ background-position:64px 64px, 64px 64px; }
   }
 
-  /* ==== メイン（外枠なし） ==== */
+  /* ==== Main (no frame) ==== */
   .card{
     width:min(900px, 95vw);
     border:none; box-shadow:none; background:transparent; border-radius:0;
@@ -69,13 +70,12 @@
     font-size: clamp(2rem, 6.2vw, 3.1rem);
     font-weight:800; letter-spacing:.06em;
     margin: calc(var(--gap) * .6) 0 calc(var(--gap) * .7);
-    color:#cfefff; /* 正解後も変えない */
+    color:#cfefff; /* 固定（正解後も色・サイズ不変） */
     text-shadow: 0 0 10px rgba(24,198,255,.3);
     min-height:3.2rem;
-    transition: text-shadow .25s ease;  /* transformは使わない */
   }
 
-  /* タイマーバー */
+  /* Timer bar */
   #timerWrap{
     width:min(560px, 88%);
     height:12px; margin: 0 auto calc(var(--gap) * .9);
@@ -101,11 +101,8 @@
   .btn:hover{ background:rgba(24,198,255,.1); box-shadow: 0 0 18px rgba(24,198,255,.45); }
   .btn:active{ transform: translateY(1px); }
 
-  /* ==== Dパッド（デフォは非表示、モバイルで表示） ==== */
-  .controls{
-    /* PCでは重ねないため非表示、モバイルで出す */
-    display:none;
-  }
+  /* ==== D-Pad (hidden on desktop) ==== */
+  .controls{ display:none; }
   .dpad{
     display:grid;
     grid-template-columns:repeat(3, var(--pad-size));
@@ -115,47 +112,50 @@
   }
   .control-btn{
     width:var(--pad-size); height:var(--pad-size);
+    display:grid; place-items:center;   /* ★SVGを完全センタリング */
     border:2px solid rgba(24,198,255,.8); border-radius:0;
-    background:transparent; color:#bdf0ff; font-weight:700; font-size:1.6rem;
+    background:transparent; color:#bdf0ff; font-weight:700;
     box-shadow: 0 0 10px rgba(24,198,255,.28);
     transition: transform .06s ease, background .18s ease;
     cursor:pointer;
   }
   .control-btn:active{ transform: scale(.96); background:rgba(24,198,255,.1); }
+  .control-btn svg{
+    width:42%; height:42%;               /* ★矢印の見えサイズ */
+    stroke: currentColor; fill:none; stroke-width:10;
+    stroke-linecap:round; stroke-linejoin:round;
+  }
   .ghost{ width:var(--pad-size); height:var(--pad-size); opacity:0; }
 
-  /* ==== スマホ用：フロー型で上下に分配（重なり無し） ==== */
+  /* ==== Mobile: flow layout (no overlap) ==== */
   @media (max-width: 760px){
     body{
       min-height:100svh;
       display:flex; flex-direction:column;
-      justify-content:space-between; align-items:center;   /* 上:カード / 下:Dパッド */
+      justify-content:space-between; align-items:center;
+      /* 下部ツールバーに隠れないよう余白を増量 */
       padding:
         max(12px, env(safe-area-inset-top))
         var(--gap)
-        max(12px, env(safe-area-inset-bottom));           /* 安全域を尊重 */
-      overflow-x:hidden;
+        calc(max(12px, env(safe-area-inset-bottom)) + 28px);
+      overflow-y:auto;   /* ★縦スクロール許可（カットされない） */
     }
     .card{
       width:min(980px, 94vw);
-      /* ちょい下げて“上すぎ”を回避 */
       margin-top: clamp(8px, 6svh, 48px);
       padding: var(--gap) var(--gap);
     }
-    /* モバイルでは文字をやや抑える */
     h1{ font-size: clamp(1.6rem, 8.5vw, 2.4rem); margin-bottom: clamp(16px, 4.5vw, 26px); }
     #score{ font-size: clamp(1rem, 3.8vw, 1.2rem); margin-bottom: clamp(12px, 3.8vw, 22px); }
     #instruction{ font-size: clamp(1.6rem, 8.4vw, 2.3rem); margin: clamp(10px, 3.6vw, 18px) 0 clamp(14px, 4.2vw, 22px); }
     #timerWrap{ margin-bottom: clamp(14px, 4.2vw, 24px); }
     .actions{ margin-top: clamp(14px, 4.2vw, 24px); }
 
-    /* Dパッドは文書フローの最後に置いて下側へ */
     .controls{
-      position: static;           /* ← 固定しない */
-      display:flex;               /* 表示 */
-      justify-content:center;
+      display:flex;            /* show D-pad */
       width:100%;
-      padding-bottom: max(6px, env(safe-area-inset-bottom));  /* 安全域 */
+      justify-content:center;
+      padding-bottom: max(6px, env(safe-area-inset-bottom));
     }
   }
 
@@ -176,23 +176,45 @@
     <div id="message" aria-live="polite"></div>
   </div>
 
-  <!-- Mobile D-Pad（モバイルでのみ表示） -->
+  <!-- Mobile D-Pad -->
   <div class="controls" role="group" aria-label="方向入力">
     <div class="dpad">
       <div class="ghost"></div>
-      <button class="control-btn" data-key="ArrowUp"   aria-label="上">↑</button>
+      <button class="control-btn" data-key="ArrowUp" aria-label="上">
+        <!-- ↑ SVG -->
+        <svg viewBox="0 0 100 100" aria-hidden="true">
+          <path d="M50 80 V30 M50 30 L32 48 M50 30 L68 48"/>
+        </svg>
+      </button>
       <div class="ghost"></div>
-      <button class="control-btn" data-key="ArrowLeft" aria-label="左">←</button>
+
+      <button class="control-btn" data-key="ArrowLeft" aria-label="左">
+        <!-- ← SVG -->
+        <svg viewBox="0 0 100 100" aria-hidden="true">
+          <path d="M70 50 H20 M20 50 L38 32 M20 50 L38 68"/>
+        </svg>
+      </button>
       <div class="ghost"></div>
-      <button class="control-btn" data-key="ArrowRight" aria-label="右">→</button>
+      <button class="control-btn" data-key="ArrowRight" aria-label="右">
+        <!-- → SVG -->
+        <svg viewBox="0 0 100 100" aria-hidden="true">
+          <path d="M30 50 H80 M80 50 L62 32 M80 50 L62 68"/>
+        </svg>
+      </button>
+
       <div class="ghost"></div>
-      <button class="control-btn" data-key="ArrowDown" aria-label="下">↓</button>
+      <button class="control-btn" data-key="ArrowDown" aria-label="下">
+        <!-- ↓ SVG -->
+        <svg viewBox="0 0 100 100" aria-hidden="true">
+          <path d="M50 20 V70 M50 70 L32 52 M50 70 L68 52"/>
+        </svg>
+      </button>
       <div class="ghost"></div>
     </div>
   </div>
 
 <script>
-/* ===== 既存の機能はそのまま ===== */
+/* ===== 既存のゲームロジック（変更なし） ===== */
 const DIRS = ["右","左","上","下"];
 const KEYMAP = {
   "右": ["ArrowRight","d","D"],
@@ -338,7 +360,7 @@ function endGame(){
 function startGame(){
   isRunning = true; score = 0; timeLimit = 3000;
   scoreEl.textContent = "SCORE: 0"; messageEl.textContent = "";
-  instructionEl.textContent = "準備中…"; // 日本語はそのまま
+  instructionEl.textContent = "準備中…"; // 日本語そのまま
   startBtn.style.display = "none";
   timerWrap.style.display = "block";
   clearTimeout(timeoutId); clearTimeout(postDelayId);
