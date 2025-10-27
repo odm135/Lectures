@@ -5,7 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>CYBER COMMAND</title>
 <style>
+  /* 【最重要】@importを<style>タグの最上部に移動し、フォントを正しく読み込む */
   @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&display=swap');
+  
+  /* スクロール完全無効化のため、html要素に高さを固定しオーバーフローを禁止 */
+  html {
+    height: 100%;
+    overflow: hidden; 
+  }
 
   :root{
     --bg:#010409;
@@ -25,16 +32,12 @@
     margin:0; min-height:100svh; color:var(--txt);
     font-family:'Orbitron',sans-serif;
     background:var(--bg);
-    /* Flexboxを適用: コンテンツ（card）とD-Pad（controls）を縦に並べる */
-    display:flex;
-    flex-direction:column;
-    justify-content:space-between;
-    align-items:center;
-    /* デスクトップのpaddingは維持 */
+    /* デスクトップのレイアウト（元の状態） */
+    display:flex; align-items:center; justify-content:center; 
     padding: calc(var(--gap) * 1.6) var(--gap);
     -webkit-user-select:none; user-select:none; touch-action:manipulation;
     overflow-x:hidden;
-    /* デフォルトでY軸のスクロールは隠す */
+    /* bodyも念のためY軸のスクロールを隠す */
     overflow-y:hidden; 
     position:relative;
   }
@@ -57,7 +60,6 @@
     border:none; box-shadow:none; background:transparent; border-radius:0;
     padding: calc(var(--gap) * 1.1) var(--gap);
     text-align:center;
-    flex-shrink: 0;
   }
 
   h1{
@@ -78,7 +80,7 @@
     font-size: clamp(2rem, 6.2vw, 3.1rem);
     font-weight:800; letter-spacing:.06em;
     margin: calc(var(--gap) * .6) 0 calc(var(--gap) * .7);
-    color:#cfefff; /* 固定（正解後も色・サイズ不変） */
+    color:#cfefff; 
     text-shadow: 0 0 10px rgba(24,198,255,.3);
     min-height:3.2rem;
   }
@@ -120,7 +122,7 @@
   }
   .control-btn{
     width:var(--pad-size); height:var(--pad-size);
-    display:grid; place-items:center;   /* ★SVGを完全センタリング */
+    display:grid; place-items:center;   
     border:2px solid rgba(24,198,255,.8); border-radius:0;
     background:transparent; color:#bdf0ff; font-weight:700;
     box-shadow: 0 0 10px rgba(24,198,255,.28);
@@ -129,7 +131,8 @@
   }
   .control-btn:active{ transform: scale(.96); background:rgba(24,198,255,.1); }
   .control-btn svg{
-    width:42%; height:42%;               /* ★矢印の見えサイズ */
+    /* 矢印の見えサイズは60%を維持 */
+    width:60%; height:60%;              
     stroke: currentColor; fill:none; stroke-width:10;
     stroke-linecap:round; stroke-linejoin:round;
   }
@@ -138,25 +141,25 @@
   /* ==== Mobile: flow layout (no overlap) ==== */
   @media (max-width: 760px){
     body{
-      /* min-height:100svh; は維持 */
+      min-height:100svh;
+      /* モバイル時のFlexbox設定 */
+      display:flex; flex-direction:column;
+      justify-content:space-between; align-items:center;
+      
+      /* スクロール対策としてoverflow-yをhiddenに設定 */
       overflow-y:hidden; 
       
-      /* ★bodyの上下paddingをゼロにし、スクロールの原因を排除 */
-      padding: 0 var(--gap);
+      /* bodyのpadding-bottomはcontrolsで確保するため、最小限に */
+      padding:
+        max(12px, env(safe-area-inset-top))
+        var(--gap)
+        max(12px, env(safe-area-inset-bottom)); 
     }
     .card{
       width:min(980px, 94vw);
-      /* 安全領域の確保と上部余白の調整 */
-      margin-top: calc(clamp(8px, 2svh, 24px) + env(safe-area-inset-top)); 
+      /* 上部の余白を維持 */
+      margin-top: clamp(8px, 6svh, 48px);
       padding: var(--gap) var(--gap);
-      /* card内の要素もflexで縦に配置 */
-      display: flex; 
-      flex-direction: column;
-      justify-content: center; 
-      /* cardが可能な限りスペースを使い、controlsとの間を埋める */
-      flex-grow: 1; 
-      flex-shrink: 1;
-      min-height: min-content; /* card自身の高さを最小限に抑え、はみ出しを防ぐ */
     }
     h1{ font-size: clamp(1.6rem, 8.5vw, 2.4rem); margin-bottom: clamp(16px, 4.5vw, 26px); }
     #score{ font-size: clamp(1rem, 3.8vw, 1.2rem); margin-bottom: clamp(12px, 3.8vw, 22px); }
@@ -168,11 +171,8 @@
       display:flex;            /* show D-pad */
       width:100%;
       justify-content:center;
-      flex-shrink: 0;
-      /* D-Padの上のマージンでcardとの間隔を確保 */
-      margin-top: clamp(12px, 4.2vw, 20px);
-      /* ★D-Padの下部パディングに、被り防止の44pxと安全領域を追加 */
-      padding-bottom: calc(max(6px, env(safe-area-inset-bottom)) + 44px);
+      /* ★ 最終修正: Navバーを避けるための安全領域と、上乗せの余白を48pxに拡大 */
+      padding-bottom: calc(max(6px, env(safe-area-inset-bottom)) + 48px);
     }
   }
 
