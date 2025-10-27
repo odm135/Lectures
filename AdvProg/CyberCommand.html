@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CYBER COMMAND</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&display=swap');
+
+  :root{
+    --bg:#010409;
+    --txt:#8bdcff;
+    --neon:#18c6ff;
+    --neon-soft:#18c6ff2b;
+    --ok:#9ff0d4;
+    --gap: clamp(22px, 5vw, 52px);
+
+    /* Dパッド：サイズと隙間（可変） */
+    --pad-size: clamp(56px, 16vw, 74px);
+    --pad-gap: clamp(8px, 3.2vw, 14px);
+
+    /* スマホ時の下部確保量（Dパッド3行＋隙間2つ＋安全域＋少し余白） */
+    --reserve-bottom: calc(var(--pad-size) * 3 + var(--pad-gap) * 2 + max(18px, env(safe-area-inset-bottom)) + 16px);
+
+    /* スマホ時の上方向の押し下げ量（“上より”に配置しつつ、上すぎない） */
+    --top-shift-mobile: clamp(150px, 10svh, 400px);
+  }
+
+  /* 背景：控えめグリッド、縦線なし */
+  body{
+    margin:0; min-height:100svh; color:var(--txt);
+    font-family:'Orbitron',sans-serif;
+    background: var(--bg);
+    display:flex; align-items:center; justify-content:center; /* PCは中央配置 */
+    padding: calc(var(--gap) * 1.6) var(--gap);
+    -webkit-user-select:none; user-select:none; touch-action:manipulation;
+    overflow:hidden; position:relative;
+  }
+  body::before{
+    content:""; position:absolute; inset:0; z-index:-2;
+    background-image:
+      linear-gradient(var(--neon-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--neon-soft) 1px, transparent 1px);
+    background-size:64px 64px;
+    animation:gridMove 12s linear infinite;
+  }
+  @keyframes gridMove{
+    0%{ background-position:0 0, 0 0; }
+    100%{ background-position:64px 64px, 64px 64px; }
+  }
+
+  /* メイン：外枠なし */
+  .card{
+    width:min(900px, 95vw);
+    border:none; box-shadow:none; background:transparent; border-radius:0;
+    padding: calc(var(--gap) * 1.1) var(--gap);
+    text-align:center;
+  }
+
+  h1{
+    margin:0 0 calc(var(--gap) * .9);
+    letter-spacing:3px; font-weight:700;
+    font-size: clamp(1.9rem, 2.7rem, 3.1rem);
+    color: var(--txt);
+    text-shadow: 0 0 8px rgba(24,198,255,.35);
+  }
+
+  #score{
+    font-size:1.2rem; color:#7fd5ff;
+    display:block; margin: 0 auto calc(var(--gap) * .7);
+    text-shadow: 0 0 6px rgba(24,198,255,.28);
+  }
+
+  #instruction{
+    font-size: clamp(2rem, 6.2vw, 3.1rem);
+    font-weight:800; letter-spacing:.06em;
+    margin: calc(var(--gap) * .6) 0 calc(var(--gap) * .7);
+    color:#cfefff; /* 正解後も変えない */
+    text-shadow: 0 0 10px rgba(24,198,255,.3);
+    min-height:3.2rem;
+    transition: text-shadow .25s ease;
+  }
+
+  /* タイマーバー */
+  #timerWrap{
+    width:min(560px, 88%);
+    height:12px; margin: 0 auto calc(var(--gap) * .9);
+    background:#0a2330; border:1px solid rgba(24,198,255,.38); border-radius:6px;
+    overflow:hidden; display:none; box-shadow: inset 0 0 6px rgba(24,198,255,.25);
+  }
+  #timerBar{ height:100%; width:100%; background: linear-gradient(90deg, #e3fbff, var(--neon)); }
+
+  #message{
+    font-size:1.1rem; margin-top: calc(var(--gap) * .35); min-height:1.5rem;
+    color: var(--ok); text-shadow: 0 0 6px rgba(159,240,212,.25);
+  }
+
+  .actions{ margin-top: calc(var(--gap) * .9); }
+  .btn{
+    background:transparent; color:#bdf0ff;
+    border:2px solid rgba(24,198,255,.8); border-radius:0;
+    padding:14px 32px; font-size:1.08rem;
+    font-family:'Orbitron',sans-serif; text-transform:uppercase; letter-spacing:2px;
+    cursor:pointer; transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+    box-shadow: 0 0 10px rgba(24,198,255,.28);
+  }
+  .btn:hover{ background:rgba(24,198,255,.1); box-shadow: 0 0 18px rgba(24,198,255,.45); }
+  .btn:active{ transform: translateY(1px); }
+
+  /* ===== Dパッド（下固定） ===== */
+  .controls{
+    position: fixed; left:0; right:0;
+    bottom: max(18px, env(safe-area-inset-bottom)); /* 安全域考慮 */
+    display:none;
+    justify-content:center; z-index:10; pointer-events:none;
+  }
+  .dpad{
+    pointer-events:auto;
+    display:grid;
+    grid-template-columns:repeat(3, var(--pad-size));
+    grid-template-rows:repeat(3, var(--pad-size));
+    gap: var(--pad-gap);
+    padding:12px; background: transparent;
+  }
+  .control-btn{
+    width:var(--pad-size); height:var(--pad-size);
+    border:2px solid rgba(24,198,255,.8); border-radius:0;
+    background:transparent; color:#bdf0ff; font-weight:700; font-size:1.6rem;
+    box-shadow: 0 0 10px rgba(24,198,255,.28);
+    transition: transform .06s ease, background .18s ease;
+    cursor:pointer;
+  }
+  .control-btn:active{ transform: scale(.96); background:rgba(24,198,255,.1); }
+  .ghost{ width:var(--pad-size); height:var(--pad-size); opacity:0; }
+
+  /* ===== スマホ用レイアウト最適化 ===== */
+  @media (max-width: 760px){
+    body{
+      justify-content:flex-start;       /* 上寄せに切替 */
+      align-items:stretch;
+      /* 上を少し下げ、下はDパッド分を確保。svhでアドレスバーの影響を低減 */
+      padding:
+        calc(var(--gap) * 0.6 + var(--top-shift-mobile))
+        var(--gap)
+        calc(var(--gap) * 0.6 + var(--reserve-bottom));
+      overflow-x:hidden;
+    }
+    .card{
+      padding: var(--gap) var(--gap);
+      width:min(980px, 94vw);
+      margin: 0 auto;                   /* 横は中央寄せ */
+      text-align:center;
+    }
+    /* モバイルでは各マージンも少し詰めて“上より”位置をキープ */
+    h1{ margin-bottom: calc(var(--gap) * .55); }
+    #score{ margin-bottom: calc(var(--gap) * .45); }
+    #instruction{ margin: calc(var(--gap) * .36) 0 calc(var(--gap) * .48); }
+    #timerWrap{ margin-bottom: calc(var(--gap) * .56); }
+    .actions{ margin-top: calc(var(--gap) * .56); }
+
+    .controls{ display:flex; }          /* Dパッド表示 */
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation:none !important; transition:none !important; }
+  }
+</style>
+</head>
+<body>
+  <div class="card" role="application" aria-label="反射神経ゲーム">
+    <h1>CYBER COMMAND</h1>
+
+    <div id="score">SCORE: 0</div>
+    <!-- 開始前は空（PRESS STARTは表示しない） -->
+    <div id="instruction"></div>
+
+    <div id="timerWrap" aria-hidden="true"><div id="timerBar"></div></div>
+
+    <div class="actions">
+      <button id="startBtn" class="btn" type="button" aria-label="START">START</button>
+    </div>
+
+    <div id="message" aria-live="polite"></div>
+  </div>
+
+  <!-- Mobile D-Pad -->
+  <div class="controls" role="group" aria-label="方向入力">
+    <div class="dpad">
+      <div class="ghost"></div>
+      <button class="control-btn" data-key="ArrowUp"   aria-label="上">↑</button>
+      <div class="ghost"></div>
+      <button class="control-btn" data-key="ArrowLeft" aria-label="左">←</button>
+      <div class="ghost"></div>
+      <button class="control-btn" data-key="ArrowRight" aria-label="右">→</button>
+      <div class="ghost"></div>
+      <button class="control-btn" data-key="ArrowDown" aria-label="下">↓</button>
+      <div class="ghost"></div>
+    </div>
+  </div>
+
+<script>
+/* ===== 機能はそのまま ===== */
+const DIRS = ["右","左","上","下"];
+const KEYMAP = {
+  "右": ["ArrowRight","d","D"],
+  "左": ["ArrowLeft","a","A"],
+  "上": ["ArrowUp","w","W"],
+  "下": ["ArrowDown","s","S"]
+};
+const rand  = (arr) => arr[Math.floor(Math.random()*arr.length)];
+const union = (a,b)=> Array.from(new Set([...a,...b]));
+const ALLOWED_KEYS = new Set(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","w","W","a","A","s","S","d","D"]);
+
+let currentInstruction = null;
+let score = 0;
+let timeoutId = null;
+let postDelayId = null;
+let acceptingInput = false;
+let isRunning = false;
+
+let timeLimit = 3000;
+const minTimeLimit = 1000;
+const speedUp = 200;
+
+const instructionEl = document.getElementById("instruction");
+const scoreEl       = document.getElementById("score");
+const messageEl     = document.getElementById("message");
+const startBtn      = document.getElementById("startBtn");
+const timerWrap     = document.getElementById("timerWrap");
+const timerBar      = document.getElementById("timerBar");
+
+/* High score */
+const HS_KEY = "reactionGameHighScore";
+const getHighScore = () => {
+  const v = Number(localStorage.getItem(HS_KEY));
+  return Number.isFinite(v) ? v : 0;
+};
+const setHighScore = (v) => localStorage.setItem(HS_KEY, String(v));
+
+/* Timer bar */
+function startTimer(ms){
+  timerWrap.style.display = "block";
+  timerBar.style.transition = "none";
+  timerBar.style.width = "100%";
+  void timerBar.offsetWidth;
+  timerBar.style.transition = `width ${ms}ms linear`;
+  requestAnimationFrame(()=>{ timerBar.style.width = "0%"; });
+}
+function stopTimer(){
+  timerBar.style.transition = "none";
+  timerBar.style.width = "0%";
+}
+
+/* Dynamic instruction */
+const keysFor = (dir)=> KEYMAP[dir];
+function buildInstruction(){
+  const base = rand([...DIRS, "無視"]);
+  if (base === "無視") return { text:"無視", ignore:true };
+
+  const modifiers = ["plain","not","notnot","notnotnot","igai","denai","matawa"];
+  const mod = rand(modifiers);
+  switch(mod){
+    case "plain":       return { text: base, correct: keysFor(base) };
+    case "not":         return { text: `${base}じゃない`, avoid: keysFor(base) };
+    case "notnot":      return { text: `${base}じゃないじゃない`, correct: keysFor(base) };
+    case "notnotnot":   return { text: `${base}じゃないじゃないじゃない`, avoid: keysFor(base) };
+    case "igai":        return { text: `${base}以外`, avoid: keysFor(base) };
+    case "denai":       return { text: `${base}ではない`, avoid: keysFor(base) };
+    case "matawa": {
+      const other = rand(DIRS.filter(d=>d!==base));
+      return { text: `${base} または ${other}`, correct: union(keysFor(base), keysFor(other)) };
+    }
+    default:            return { text: base, correct: keysFor(base) };
+  }
+}
+
+/* Flow */
+function nextInstruction(){
+  clearTimeout(timeoutId); clearTimeout(postDelayId);
+  messageEl.textContent = "";
+
+  currentInstruction = buildInstruction();
+  instructionEl.textContent = currentInstruction.text;
+  acceptingInput = true;
+  startTimer(timeLimit);
+
+  timeoutId = setTimeout(()=>{
+    if (!acceptingInput) return;
+    acceptingInput = false; stopTimer();
+    if (currentInstruction.ignore){
+      success(); // 何も押さなかった＝正解
+    } else {
+      endGame();
+    }
+  }, timeLimit);
+}
+
+/* Input */
+function processKey(key){
+  if (!isRunning || !acceptingInput) return;
+  if (!ALLOWED_KEYS.has(key)) return; // 許可外は無視
+
+  if (currentInstruction.ignore){
+    acceptingInput = false; clearTimeout(timeoutId); stopTimer(); endGame(); return;
+  }
+  if (currentInstruction.correct){
+    if (currentInstruction.correct.includes(key)){
+      acceptingInput = false; clearTimeout(timeoutId); stopTimer(); success();
+    } else {
+      acceptingInput = false; clearTimeout(timeoutId); stopTimer(); endGame();
+    }
+  } else if (currentInstruction.avoid){
+    if (currentInstruction.avoid.includes(key)){
+      acceptingInput = false; clearTimeout(timeoutId); stopTimer(); endGame();
+    } else {
+      acceptingInput = false; clearTimeout(timeoutId); stopTimer(); success();
+    }
+  }
+}
+
+/* Success / End */
+function success(){
+  score++;
+  scoreEl.textContent = "SCORE: " + score;
+  messageEl.textContent = "正解！"; // 日本語のまま
+  timeLimit = Math.max(minTimeLimit, timeLimit - speedUp);
+  clearTimeout(postDelayId);
+  postDelayId = setTimeout(nextInstruction, 800);
+}
+function endGame(){
+  isRunning = false; acceptingInput = false;
+  clearTimeout(timeoutId); clearTimeout(postDelayId);
+  const prevHigh = getHighScore();
+  const isNew = score > prevHigh; const high = isNew ? score : prevHigh;
+  if (isNew) setHighScore(high);
+
+  instructionEl.textContent = "GAME OVER!";
+  messageEl.textContent = `HIGH SCORE: ${high}${isNew ? "（更新！）" : ""}`;
+  timerWrap.style.display = "none";
+  startBtn.textContent = "RESTART";
+  startBtn.style.display = "inline-block";
+}
+
+/* Start / Abort */
+function startGame(){
+  isRunning = true; score = 0; timeLimit = 3000;
+  scoreEl.textContent = "SCORE: 0"; messageEl.textContent = "";
+  instructionEl.textContent = "準備中…"; // 日本語はそのまま
+  startBtn.style.display = "none";
+  timerWrap.style.display = "block";
+  clearTimeout(timeoutId); clearTimeout(postDelayId);
+  nextInstruction();
+}
+function abortToStart(){ // Esc → タイトル
+  isRunning = false; acceptingInput = false;
+  clearTimeout(timeoutId); clearTimeout(postDelayId); stopTimer();
+  timerWrap.style.display = "none";
+  instructionEl.textContent = ""; // PRESS STARTは出さない
+  messageEl.textContent = "";
+  score = 0; scoreEl.textContent = "SCORE: 0";
+  startBtn.textContent = "START";
+  startBtn.style.display = "inline-block";
+}
+
+/* Handlers */
+function handleKeydown(e){
+  if (!isRunning && (e.code === "Space" || e.key === " ")){
+    e.preventDefault(); startGame(); return;
+  }
+  if (isRunning && e.key === "Escape"){
+    e.preventDefault(); abortToStart(); return;
+  }
+  if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key)) e.preventDefault();
+  processKey(e.key);
+}
+function bindDpad(){
+  document.querySelectorAll(".control-btn").forEach(btn=>{
+    btn.addEventListener("pointerdown", (e)=>{
+      e.preventDefault();
+      const key = btn.getAttribute("data-key");
+      processKey(key);
+    });
+  });
+}
+
+/* Boot */
+const startBtnEl = document.getElementById("startBtn");
+if (startBtnEl) startBtnEl.addEventListener("click", startGame);
+window.addEventListener("keydown", handleKeydown, { passive:false });
+bindDpad();
+</script>
+</body>
+</html>
