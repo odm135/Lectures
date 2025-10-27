@@ -25,10 +25,17 @@
     margin:0; min-height:100svh; color:var(--txt);
     font-family:'Orbitron',sans-serif;
     background:var(--bg);
-    display:flex; align-items:center; justify-content:center;  /* desktop center */
+    /* Flexboxを適用: コンテンツ（card）とD-Pad（controls）を縦に並べる */
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    align-items:center;
+    /* デスクトップのpaddingは維持 */
     padding: calc(var(--gap) * 1.6) var(--gap);
     -webkit-user-select:none; user-select:none; touch-action:manipulation;
-    overflow-x:hidden;           /* ← 縦スクロールは必要に応じ許可する */
+    overflow-x:hidden;
+    /* デフォルトでY軸のスクロールは隠す */
+    overflow-y:hidden; 
     position:relative;
   }
   body::before{
@@ -50,6 +57,8 @@
     border:none; box-shadow:none; background:transparent; border-radius:0;
     padding: calc(var(--gap) * 1.1) var(--gap);
     text-align:center;
+    /* cardが画面の高さを超えないようflex-shrinkを設定 */
+    flex-shrink: 0;
   }
 
   h1{
@@ -130,20 +139,29 @@
   /* ==== Mobile: flow layout (no overlap) ==== */
   @media (max-width: 760px){
     body{
-      min-height:100svh;
-      display:flex; flex-direction:column;
-      justify-content:space-between; align-items:center;
-      /* 下部ツールバーに隠れないよう余白を増量 */
-      padding:
-        max(12px, env(safe-area-inset-top))
-        var(--gap)
-        calc(max(12px, env(safe-area-inset-bottom)) + 28px);
-      overflow-y:auto;   /* ★縦スクロール許可（カットされない） */
+      /* min-height:100svh; は維持 */
+      /* display/flex-direction/justify-content/align-items は上で共通化 */
+      
+      /* スクロールを確実に禁止 */
+      overflow-y:hidden; 
+      
+      /* ★bodyの上下paddingを最小限にする */
+      padding-top: max(8px, env(safe-area-inset-top));
+      padding-bottom: max(8px, env(safe-area-inset-bottom));
+      padding-left: var(--gap);
+      padding-right: var(--gap);
     }
     .card{
       width:min(980px, 94vw);
-      margin-top: clamp(8px, 6svh, 48px);
+      /* bodyのpaddingを減らした分、cardの上マージンを少し増やし調整 */
+      margin-top: clamp(8px, 2svh, 24px); 
       padding: var(--gap) var(--gap);
+      /* スクロールを防ぐため、高さを柔軟にする */
+      flex-grow: 1; 
+      flex-shrink: 1;
+      display: flex; /* card内の要素もflexで縦に配置 */
+      flex-direction: column;
+      justify-content: center; /* card内の要素を中央に集約 */
     }
     h1{ font-size: clamp(1.6rem, 8.5vw, 2.4rem); margin-bottom: clamp(16px, 4.5vw, 26px); }
     #score{ font-size: clamp(1rem, 3.8vw, 1.2rem); margin-bottom: clamp(12px, 3.8vw, 22px); }
@@ -155,7 +173,11 @@
       display:flex;            /* show D-pad */
       width:100%;
       justify-content:center;
-      padding-bottom: max(6px, env(safe-area-inset-bottom));
+      /* D-Padの下部パディングに、被り防止の44pxを追加 */
+      padding-bottom: calc(max(6px, env(safe-area-inset-bottom)) + 44px);
+      /* D-Padの上のマージンを調整し、cardとの間隔を確保 */
+      margin-top: clamp(12px, 4.2vw, 20px);
+      flex-shrink: 0;
     }
   }
 
@@ -176,12 +198,10 @@
     <div id="message" aria-live="polite"></div>
   </div>
 
-  <!-- Mobile D-Pad -->
   <div class="controls" role="group" aria-label="方向入力">
     <div class="dpad">
       <div class="ghost"></div>
       <button class="control-btn" data-key="ArrowUp" aria-label="上">
-        <!-- ↑ SVG -->
         <svg viewBox="0 0 100 100" aria-hidden="true">
           <path d="M50 80 V30 M50 30 L32 48 M50 30 L68 48"/>
         </svg>
@@ -189,14 +209,12 @@
       <div class="ghost"></div>
 
       <button class="control-btn" data-key="ArrowLeft" aria-label="左">
-        <!-- ← SVG -->
         <svg viewBox="0 0 100 100" aria-hidden="true">
           <path d="M70 50 H20 M20 50 L38 32 M20 50 L38 68"/>
         </svg>
       </button>
       <div class="ghost"></div>
       <button class="control-btn" data-key="ArrowRight" aria-label="右">
-        <!-- → SVG -->
         <svg viewBox="0 0 100 100" aria-hidden="true">
           <path d="M30 50 H80 M80 50 L62 32 M80 50 L62 68"/>
         </svg>
@@ -204,7 +222,6 @@
 
       <div class="ghost"></div>
       <button class="control-btn" data-key="ArrowDown" aria-label="下">
-        <!-- ↓ SVG -->
         <svg viewBox="0 0 100 100" aria-hidden="true">
           <path d="M50 20 V70 M50 70 L32 52 M50 70 L68 52"/>
         </svg>
