@@ -57,7 +57,6 @@
     border:none; box-shadow:none; background:transparent; border-radius:0;
     padding: calc(var(--gap) * 1.1) var(--gap);
     text-align:center;
-    /* cardが画面の高さを超えないようflex-shrinkを設定 */
     flex-shrink: 0;
   }
 
@@ -140,28 +139,24 @@
   @media (max-width: 760px){
     body{
       /* min-height:100svh; は維持 */
-      /* display/flex-direction/justify-content/align-items は上で共通化 */
-      
-      /* スクロールを確実に禁止 */
       overflow-y:hidden; 
       
-      /* ★bodyの上下paddingを最小限にする */
-      padding-top: max(8px, env(safe-area-inset-top));
-      padding-bottom: max(8px, env(safe-area-inset-bottom));
-      padding-left: var(--gap);
-      padding-right: var(--gap);
+      /* ★bodyの上下paddingをゼロにし、スクロールの原因を排除 */
+      padding: 0 var(--gap);
     }
     .card{
       width:min(980px, 94vw);
-      /* bodyのpaddingを減らした分、cardの上マージンを少し増やし調整 */
-      margin-top: clamp(8px, 2svh, 24px); 
+      /* 安全領域の確保と上部余白の調整 */
+      margin-top: calc(clamp(8px, 2svh, 24px) + env(safe-area-inset-top)); 
       padding: var(--gap) var(--gap);
-      /* スクロールを防ぐため、高さを柔軟にする */
+      /* card内の要素もflexで縦に配置 */
+      display: flex; 
+      flex-direction: column;
+      justify-content: center; 
+      /* cardが可能な限りスペースを使い、controlsとの間を埋める */
       flex-grow: 1; 
       flex-shrink: 1;
-      display: flex; /* card内の要素もflexで縦に配置 */
-      flex-direction: column;
-      justify-content: center; /* card内の要素を中央に集約 */
+      min-height: min-content; /* card自身の高さを最小限に抑え、はみ出しを防ぐ */
     }
     h1{ font-size: clamp(1.6rem, 8.5vw, 2.4rem); margin-bottom: clamp(16px, 4.5vw, 26px); }
     #score{ font-size: clamp(1rem, 3.8vw, 1.2rem); margin-bottom: clamp(12px, 3.8vw, 22px); }
@@ -173,11 +168,11 @@
       display:flex;            /* show D-pad */
       width:100%;
       justify-content:center;
-      /* D-Padの下部パディングに、被り防止の44pxを追加 */
-      padding-bottom: calc(max(6px, env(safe-area-inset-bottom)) + 44px);
-      /* D-Padの上のマージンを調整し、cardとの間隔を確保 */
-      margin-top: clamp(12px, 4.2vw, 20px);
       flex-shrink: 0;
+      /* D-Padの上のマージンでcardとの間隔を確保 */
+      margin-top: clamp(12px, 4.2vw, 20px);
+      /* ★D-Padの下部パディングに、被り防止の44pxと安全領域を追加 */
+      padding-bottom: calc(max(6px, env(safe-area-inset-bottom)) + 44px);
     }
   }
 
