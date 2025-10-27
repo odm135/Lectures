@@ -2,36 +2,30 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>CYBER COMMAND</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&display=swap');
 
   :root{
     --bg:#010409;
-    --txt:#8bdcff;
-    --neon:#18c6ff;
+    --txt:#8bdcff;      /* 濃いめの水色（本文） */
+    --neon:#18c6ff;     /* アクセント */
     --neon-soft:#18c6ff2b;
-    --ok:#9ff0d4;
+    --ok:#9ff0d4;       /* 正解メッセージ */
     --gap: clamp(22px, 5vw, 52px);
 
-    /* Dパッド：サイズと隙間（可変） */
-    --pad-size: clamp(56px, 16vw, 74px);
+    /* Dパッド（モバイルで自動調整） */
+    --pad-size: clamp(54px, 15vw, 72px);
     --pad-gap: clamp(8px, 3.2vw, 14px);
-
-    /* スマホ時の下部確保量（Dパッド3行＋隙間2つ＋安全域＋少し余白） */
-    --reserve-bottom: calc(var(--pad-size) * 3 + var(--pad-gap) * 2 + max(18px, env(safe-area-inset-bottom)) + 16px);
-
-    /* スマホ時の上方向の押し下げ量（“上より”に配置しつつ、上すぎない） */
-    --top-shift-mobile: clamp(150px, 10svh, 400px);
   }
 
-  /* 背景：控えめグリッド、縦線なし */
+  /* ==== 背景（控えめグリッド、縦線なし） ==== */
   body{
     margin:0; min-height:100svh; color:var(--txt);
     font-family:'Orbitron',sans-serif;
-    background: var(--bg);
-    display:flex; align-items:center; justify-content:center; /* PCは中央配置 */
+    background:var(--bg);
+    display:flex; align-items:center; justify-content:center;  /* PCは中央配置 */
     padding: calc(var(--gap) * 1.6) var(--gap);
     -webkit-user-select:none; user-select:none; touch-action:manipulation;
     overflow:hidden; position:relative;
@@ -49,7 +43,7 @@
     100%{ background-position:64px 64px, 64px 64px; }
   }
 
-  /* メイン：外枠なし */
+  /* ==== メイン（外枠なし） ==== */
   .card{
     width:min(900px, 95vw);
     border:none; box-shadow:none; background:transparent; border-radius:0;
@@ -78,7 +72,7 @@
     color:#cfefff; /* 正解後も変えない */
     text-shadow: 0 0 10px rgba(24,198,255,.3);
     min-height:3.2rem;
-    transition: text-shadow .25s ease;
+    transition: text-shadow .25s ease;  /* transformは使わない */
   }
 
   /* タイマーバー */
@@ -107,20 +101,17 @@
   .btn:hover{ background:rgba(24,198,255,.1); box-shadow: 0 0 18px rgba(24,198,255,.45); }
   .btn:active{ transform: translateY(1px); }
 
-  /* ===== Dパッド（下固定） ===== */
+  /* ==== Dパッド（デフォは非表示、モバイルで表示） ==== */
   .controls{
-    position: fixed; left:0; right:0;
-    bottom: max(18px, env(safe-area-inset-bottom)); /* 安全域考慮 */
+    /* PCでは重ねないため非表示、モバイルで出す */
     display:none;
-    justify-content:center; z-index:10; pointer-events:none;
   }
   .dpad{
-    pointer-events:auto;
     display:grid;
     grid-template-columns:repeat(3, var(--pad-size));
     grid-template-rows:repeat(3, var(--pad-size));
     gap: var(--pad-gap);
-    padding:12px; background: transparent;
+    padding:12px;
   }
   .control-btn{
     width:var(--pad-size); height:var(--pad-size);
@@ -133,32 +124,39 @@
   .control-btn:active{ transform: scale(.96); background:rgba(24,198,255,.1); }
   .ghost{ width:var(--pad-size); height:var(--pad-size); opacity:0; }
 
-  /* ===== スマホ用レイアウト最適化 ===== */
+  /* ==== スマホ用：フロー型で上下に分配（重なり無し） ==== */
   @media (max-width: 760px){
     body{
-      justify-content:flex-start;       /* 上寄せに切替 */
-      align-items:stretch;
-      /* 上を少し下げ、下はDパッド分を確保。svhでアドレスバーの影響を低減 */
+      min-height:100svh;
+      display:flex; flex-direction:column;
+      justify-content:space-between; align-items:center;   /* 上:カード / 下:Dパッド */
       padding:
-        calc(var(--gap) * 0.6 + var(--top-shift-mobile))
+        max(12px, env(safe-area-inset-top))
         var(--gap)
-        calc(var(--gap) * 0.6 + var(--reserve-bottom));
+        max(12px, env(safe-area-inset-bottom));           /* 安全域を尊重 */
       overflow-x:hidden;
     }
     .card{
-      padding: var(--gap) var(--gap);
       width:min(980px, 94vw);
-      margin: 0 auto;                   /* 横は中央寄せ */
-      text-align:center;
+      /* ちょい下げて“上すぎ”を回避 */
+      margin-top: clamp(8px, 6svh, 48px);
+      padding: var(--gap) var(--gap);
     }
-    /* モバイルでは各マージンも少し詰めて“上より”位置をキープ */
-    h1{ margin-bottom: calc(var(--gap) * .55); }
-    #score{ margin-bottom: calc(var(--gap) * .45); }
-    #instruction{ margin: calc(var(--gap) * .36) 0 calc(var(--gap) * .48); }
-    #timerWrap{ margin-bottom: calc(var(--gap) * .56); }
-    .actions{ margin-top: calc(var(--gap) * .56); }
+    /* モバイルでは文字をやや抑える */
+    h1{ font-size: clamp(1.6rem, 8.5vw, 2.4rem); margin-bottom: clamp(16px, 4.5vw, 26px); }
+    #score{ font-size: clamp(1rem, 3.8vw, 1.2rem); margin-bottom: clamp(12px, 3.8vw, 22px); }
+    #instruction{ font-size: clamp(1.6rem, 8.4vw, 2.3rem); margin: clamp(10px, 3.6vw, 18px) 0 clamp(14px, 4.2vw, 22px); }
+    #timerWrap{ margin-bottom: clamp(14px, 4.2vw, 24px); }
+    .actions{ margin-top: clamp(14px, 4.2vw, 24px); }
 
-    .controls{ display:flex; }          /* Dパッド表示 */
+    /* Dパッドは文書フローの最後に置いて下側へ */
+    .controls{
+      position: static;           /* ← 固定しない */
+      display:flex;               /* 表示 */
+      justify-content:center;
+      width:100%;
+      padding-bottom: max(6px, env(safe-area-inset-bottom));  /* 安全域 */
+    }
   }
 
   @media (prefers-reduced-motion: reduce){
@@ -169,21 +167,16 @@
 <body>
   <div class="card" role="application" aria-label="反射神経ゲーム">
     <h1>CYBER COMMAND</h1>
-
     <div id="score">SCORE: 0</div>
-    <!-- 開始前は空（PRESS STARTは表示しない） -->
     <div id="instruction"></div>
-
     <div id="timerWrap" aria-hidden="true"><div id="timerBar"></div></div>
-
     <div class="actions">
       <button id="startBtn" class="btn" type="button" aria-label="START">START</button>
     </div>
-
     <div id="message" aria-live="polite"></div>
   </div>
 
-  <!-- Mobile D-Pad -->
+  <!-- Mobile D-Pad（モバイルでのみ表示） -->
   <div class="controls" role="group" aria-label="方向入力">
     <div class="dpad">
       <div class="ghost"></div>
@@ -199,7 +192,7 @@
   </div>
 
 <script>
-/* ===== 機能はそのまま ===== */
+/* ===== 既存の機能はそのまま ===== */
 const DIRS = ["右","左","上","下"];
 const KEYMAP = {
   "右": ["ArrowRight","d","D"],
