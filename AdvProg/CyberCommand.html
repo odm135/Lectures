@@ -131,8 +131,8 @@
   }
   .control-btn:active{ transform: scale(.96); background:rgba(24,198,255,.1); }
   .control-btn svg{
-    /* 矢印の見えサイズは60%を維持 */
-    width:60%; height:60%;              
+    /* ★ 修正: 矢印のサイズを90%に拡大 */
+    width:90%; height:90%;              
     stroke: currentColor; fill:none; stroke-width:10;
     stroke-linecap:round; stroke-linejoin:round;
   }
@@ -157,8 +157,8 @@
     }
     .card{
       width:min(980px, 94vw);
-      /* 上部の余白を維持 */
-      margin-top: clamp(8px, 6svh, 48px);
+      /* ★ 修正: 上部の余白を大幅に狭くする */
+      margin-top: clamp(0px, 2svh, 16px);
       padding: var(--gap) var(--gap);
     }
     h1{ font-size: clamp(1.6rem, 8.5vw, 2.4rem); margin-bottom: clamp(16px, 4.5vw, 26px); }
@@ -171,8 +171,8 @@
       display:flex;            /* show D-pad */
       width:100%;
       justify-content:center;
-      /* ★ 最終修正: Navバーを避けるための安全領域と、上乗せの余白を48pxに拡大 */
-      padding-bottom: calc(max(6px, env(safe-area-inset-bottom)) + 48px);
+      /* ★ 最終修正: Navバーを避ける安全領域と、上乗せの余白を72pxに拡大 */
+      padding-bottom: calc(max(6px, env(safe-area-inset-bottom)) + 72px);
     }
   }
 
