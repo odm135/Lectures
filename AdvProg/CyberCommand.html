@@ -71,7 +71,9 @@
   }
 
   #score{
-    font-size:1.2rem; color:#7fd5ff;
+    /* ★ 修正: PC表示時のSCOREの文字サイズを大きく戻す */
+    font-size: clamp(1.4rem, 4.5vw, 1.8rem); 
+    color:#7fd5ff;
     display:block; margin: 0 auto calc(var(--gap) * .7);
     text-shadow: 0 0 6px rgba(24,198,255,.28);
   }
@@ -161,25 +163,22 @@
     }
     .card{
       width:min(980px, 94vw);
-      /* ★ 修正: コンテンツを少し上に移動 */
+      /* コンテンツを上に移動 */
       margin-top: clamp(8px, 4svh, 32px);
       padding: var(--gap) var(--gap);
       
-      /* ★ 修正: 90%に縮小し、中央に配置してD-Pad分のスペースを確保 */
+      /* 90%に縮小し、中央に配置してD-Pad分のスペースを確保 */
       transform: scale(.9); 
       /* 縮小で要素の基準位置がずれるため、位置調整 */
       transform-origin: top center; 
       
-      /* ★ 修正: D-Padとの間隔を確保するため、マージンを大きく設定 */
+      /* D-Padとの間隔を確保するため、マージンを大きく設定 */
       margin-bottom: clamp(60px, 15vw, 90px); 
     }
     h1{ font-size: clamp(1.6rem, 8.5vw, 2.4rem); margin-bottom: clamp(16px, 4.5vw, 26px); }
     
-    /* ★ 修正: SCOREの文字サイズを大きく */
-    #score{ 
-      font-size: clamp(1.4rem, 4.5vw, 1.8rem); 
-      margin-bottom: clamp(12px, 3.8vw, 22px); 
-    }
+    /* モバイル時のSCOREの文字サイズは、親の#scoreの設定がそのまま適用されるように変更はしない */
+    /* #score{ font-size: clamp(1.4rem, 4.5vw, 1.8rem); margin-bottom: clamp(12px, 3.8vw, 22px); } */
     
     #instruction{ 
       font-size: clamp(1.6rem, 8.4vw, 2.3rem); 
@@ -197,16 +196,16 @@
       width:100%;
       justify-content:center;
       
-      /* ★ 修正: D-Padを画面下部に固定 */
+      /* D-Padを画面下部に固定 */
       position: fixed;
-      bottom: 0;
+      bottom: -60px; /* D-Padを画面外に押し下げて、被りを解消 */
       left: 0;
       right: 0;
       z-index: 100; /* 最前面に表示 */
       background: transparent; /* 背景色を透明にし、グリッドを表示 */
 
-      /* D-Pad下部の余白を大きく確保 */
-      padding-bottom: calc(max(6px, env(safe-area-inset-bottom)) + 60px);
+      /* bottom:-60pxに設定したため、padding-bottomを調整 */
+      padding-bottom: calc(max(6px, env(safe-area-inset-bottom)) + 120px);
     }
   }
 
