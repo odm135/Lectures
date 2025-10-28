@@ -22,7 +22,7 @@
     --ok:#9ff0d4;
     --gap: clamp(22px, 5vw, 52px);
 
-    /* D-pad sizes */
+    /* D-pad sizes (PC/デフォルト) */
     --pad-size: clamp(52px, 14.5vw, 68px);
     --pad-gap: clamp(8px, 3.2vw, 14px);
   }
@@ -71,7 +71,7 @@
   }
 
   #score{
-    /* PC表示時のSCOREの文字サイズを大きく戻す (clamp(1.4rem, 4.5vw, 1.8rem)相当) */
+    /* PC表示時のSCOREの文字サイズ */
     font-size: clamp(1.4rem, 4.5vw, 1.8rem); 
     color:#7fd5ff;
     display:block; margin: 0 auto calc(var(--gap) * .7);
@@ -146,6 +146,13 @@
 
   /* ==== Mobile: flow layout (no overlap) ==== */
   @media (max-width: 760px){
+    
+    /* ★ 修正: モバイル用のD-Padサイズを大幅に縮小する変数定義 */
+    :root{
+      --pad-size: clamp(40px, 12vw, 55px); /* ボタンを小さく */
+      --pad-gap: clamp(6px, 2.5vw, 10px); /* ボタン間の隙間も小さく */
+    }
+    
     body{
       min-height:100svh;
       /* モバイル時のFlexbox設定 */
@@ -163,21 +170,19 @@
     }
     .card{
       width:min(980px, 94vw);
-      /* コンテンツを上に移動 */
+      /* コンテンツ全体をさらに小さく上に寄せる */
       margin-top: clamp(8px, 4svh, 32px);
       padding: var(--gap) var(--gap);
-      
-      /* 90%に縮小し、中央に配置してD-Pad分のスペースを確保 */
-      transform: scale(.9); 
-      /* 縮小で要素の基準位置がずれるため、位置調整 */
+      /* ★ 修正: コンテンツ全体を0.85に縮小 */
+      transform: scale(.85); 
       transform-origin: top center; 
-      
       /* D-Padとの間隔を確保するため、マージンを大きく設定 */
       margin-bottom: clamp(60px, 15vw, 90px); 
     }
     h1{ font-size: clamp(1.6rem, 8.5vw, 2.4rem); margin-bottom: clamp(16px, 4.5vw, 26px); }
     
-    /* モバイル時のSCOREの文字サイズは、親の#scoreの設定が適用されるため個別設定を削除 */
+    /* ★ 修正: SCOREの文字サイズも小さく */
+    #score{ font-size: clamp(1rem, 3.8vw, 1.2rem); margin-bottom: clamp(12px, 3.8vw, 22px); }
     
     #instruction{ 
       font-size: clamp(1.6rem, 8.4vw, 2.3rem); 
@@ -189,6 +194,10 @@
 
     #timerWrap{ margin-bottom: clamp(14px, 4.2vw, 24px); }
     .actions{ margin-top: clamp(14px, 4.2vw, 24px); }
+    .btn{
+      /* ★ 修正: START/RESTARTボタンの文字サイズを小さく */
+      padding:10px 24px; font-size:0.9rem;
+    }
 
     .controls{
       display:flex;            /* show D-pad */
@@ -197,15 +206,16 @@
       
       /* D-Padを画面下部に固定 */
       position: fixed;
-      /* ★ 修正: bottomの値をさらにマイナスにし、D-Padを画面外へ強く押し下げて重なりを解消 */
-      bottom: -100px; 
+      /* ★ 修正: bottomを0に戻し、padding-bottomでスペースを調整 */
+      bottom: 0; 
       left: 0;
       right: 0;
       z-index: 100; /* 最前面に表示 */
-      background: transparent; /* 背景色を透明にし、グリッドを表示 */
+      background: transparent; 
 
-      /* bottom:-100pxに設定したため、padding-bottomを調整 */
-      padding-bottom: calc(max(6px, env(safe-area-inset-bottom)) + 140px);
+      /* ★ 修正: D-Padの表示領域を確保するための余白 */
+      padding-bottom: calc(max(6px, env(safe-area-inset-bottom)) + 24px);
+      padding-top: 12px;
     }
   }
 
